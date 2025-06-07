@@ -1,0 +1,9 @@
+{
+  "name": "yt_ai_host",
+  "description": "Native messaging for YouTube AI Summarizer",
+  "path": "C:\\path\\to\\yt_ai_host.pyw",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://<YOUR_EXTENSION_ID>/"
+  ]
+}

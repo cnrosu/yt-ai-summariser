@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body style="width: 420px;">
+  <h2>Settings</h2>
+
+  <label for="modelSelect">Choose AI Model:</label>
+  <select id="modelSelect">
+    <option value="gpt-4o">GPT-4o</option>
+    <option value="gpt-4">GPT-4</option>
+    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+  </select>
+
+  <button id="saveSettings">Save</button>
+
+  <script>
+    const modelSelect = document.getElementById("modelSelect");
+
+    chrome.storage.sync.get("model", (res) => {
+      if (res.model) {
+        modelSelect.value = res.model;
+      }
+    });
+
+    document.getElementById("saveSettings").addEventListener("click", () => {
+      const selectedModel = modelSelect.value;
+      chrome.storage.sync.set({ model: selectedModel }, () => {
+        alert("Settings saved.");
+      });
+    });
+  </script>
+</body>
+</html>

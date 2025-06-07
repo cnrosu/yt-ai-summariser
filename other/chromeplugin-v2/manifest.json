@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube AI Summarizer",
+  "version": "1.0",
+  "permissions": ["nativeMessaging", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/watch*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "YouTube AI"
+  }
+}

@@ -1,0 +1,138 @@
+from flask import Flask, request, jsonify
+import sys
+import subprocess
+import whisper
+import os
+import tempfile
+import glob
+import traceback
+import uuid
+import threading
+import shutil
+import json
+from urllib.parse import urlparse, parse_qs
+
+# Patch PATH so that Whisper can find ffmpeg.
+os.environ["PATH"] += os.pathsep + os.path.abspath("./ffmpeg/bin")
+
+app = Flask(__name__)
+
+# Global dictionary to hold active job statuses and results (transient).
+jobs = {}
+
+# Persistent caching: transcripts are stored in a folder under yt-ai-summarizer/chromeplugin/transcripts.
+# The folder is defined relative to the current working directory.
+CACHE_DIR = os.path.join(os.getcwd(), "chromeplugin", "transcripts")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+def get_cache_filename(video_id):
+    """Return the full path of the cache file for the given video id."""
+    return os.path.join(CACHE_DIR, f"{video_id}.json")
+
+def process_job(job_id, url, video_id):
+    try:
+        temp_dir = tempfile.mkdtemp()
+        print("Using temp dir:", temp_dir)
+        jobs[job_id]['status'] = "downloading"
+        # Download audio using yt-dlp.
+        subprocess.run([
+            sys.executable, "-m", "yt_dlp",
+            "-x", "--audio-format", "mp3",
+            "--ffmpeg-location", "./ffmpeg/bin",
+            "-o", f"{temp_dir}/%(title)s.%(ext)s",
+            url
+        ], check=True)
+
+        mp3_files = glob.glob(os.path.join(temp_dir, "*.mp3"))
+        if not mp3_files:
+            raise Exception("No MP3 file was downloaded.")
+        audio_file = mp3_files[0]
+        print("Found audio file:", audio_file)
+        jobs[job_id]['status'] = "transcribing"
+        print("Loading Whisper model...")
+        model = whisper.load_model("base")
+        print("Starting transcription...")
+        result = model.transcribe(audio_file)
+        transcript = result["text"]
+        print("Transcription complete.")
+        jobs[job_id]['status'] = "done"
+        jobs[job_id]['transcript'] = transcript
+
+        # Save the transcript persistently as a JSON file.
+        cache_data = {"video_id": video_id, "transcript": transcript}
+        cache_filename = get_cache_filename(video_id)
+        with open(cache_filename, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f)
+        print("Cached transcript to", cache_filename)
+
+        os.remove(audio_file)
+        shutil.rmtree(temp_dir)
+
+    except Exception as e:
+        print("ERROR during transcription:")
+        traceback.print_exc()
+        jobs[job_id]['status'] = "error"
+        jobs[job_id]['error'] = str(e)
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception:
+            pass
+
+@app.route("/api/transcribe", methods=["POST"])
+def start_transcription():
+    data = request.get_json()
+    url = data.get("url")
+    if not url:
+        return jsonify({"error": "URL is required"}), 400
+    parsed_url = urlparse(url)
+    qs = parse_qs(parsed_url.query)
+    video_id = qs.get("v", [None])[0]
+    if not video_id:
+        return jsonify({"error": "Invalid YouTube URL: video id not found"}), 400
+    # Check if a cached transcript exists.
+    cache_filename = get_cache_filename(video_id)
+    if os.path.isfile(cache_filename):
+        with open(cache_filename, "r", encoding="utf-8") as f:
+            cache_data = json.load(f)
+        print("Found cached transcript for video ID:", video_id)
+        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+    # Otherwise, start a new transcription job.
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {"status": "queued"}
+    thread = threading.Thread(target=process_job, args=(job_id, url, video_id))
+    thread.start()
+    return jsonify({"jobId": job_id})
+
+@app.route("/api/status", methods=["GET"])
+def job_status():
+    job_id = request.args.get("jobId")
+    if not job_id or job_id not in jobs:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(jobs[job_id])
+
+@app.route("/api/kill", methods=["POST"])
+def kill_job():
+    job_id = request.args.get("jobId")
+    if not job_id or job_id not in jobs:
+        return jsonify({"error": "Job not found"}), 404
+    job = jobs[job_id]
+    job["killed"] = True
+    return jsonify({"success": True, "status": "cancelled"})
+
+@app.route("/api/load", methods=["GET"])
+def load_transcript():
+    video_id = request.args.get("videoId")
+    if not video_id:
+        return jsonify({"error": "videoId parameter is required"}), 400
+    cache_filename = get_cache_filename(video_id)
+    if os.path.isfile(cache_filename):
+        with open(cache_filename, "r", encoding="utf-8") as f:
+            cache_data = json.load(f)
+        print("Loaded cached transcript for video id:", video_id)
+        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+    else:
+        return jsonify({"error": "Transcript not found"}), 404
+
+if __name__ == "__main__":
+    print("🚀 Starting YouTube AI server on http://localhost:5010")
+    app.run(port=5010)
