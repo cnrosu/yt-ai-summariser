@@ -1,4 +1,4 @@
-Write-Host "`n🚀 Starting YouTube AI Setup..." -ForegroundColor Cyan
+Write-Host "`n🚀 Starting YouTranscribe Setup..." -ForegroundColor Cyan
 
 # 1. Check Python version
 $py = "C:\Users\CJ\AppData\Local\Programs\Python\Python310\python.exe"

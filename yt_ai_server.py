@@ -11,6 +11,7 @@ import threading
 import shutil
 import json
 from urllib.parse import urlparse, parse_qs
+from lzstring import LZString
 
 # Patch PATH so that Whisper can find ffmpeg.
 os.environ["PATH"] += os.pathsep + os.path.abspath("./ffmpeg/bin")
@@ -24,6 +25,9 @@ jobs = {}
 # The folder is defined relative to the current working directory.
 CACHE_DIR = os.path.join(os.getcwd(), "chromeplugin", "transcripts")
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+# Used to compress transcripts before sending to the extension
+lz = LZString()
 
 def get_cache_filename(video_id):
     """Return the full path of the cache file for the given video id."""
@@ -95,7 +99,8 @@ def start_transcription():
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
         print("Found cached transcript for video ID:", video_id)
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+        compressed = lz.compressToBase64(cache_data["transcript"])
+        return jsonify({"transcript": compressed, "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "queued"}
@@ -108,7 +113,10 @@ def job_status():
     job_id = request.args.get("jobId")
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify(jobs[job_id])
+    job = jobs[job_id].copy()
+    if job.get("transcript"):
+        job["transcript"] = lz.compressToBase64(job["transcript"])
+    return jsonify(job)
 
 @app.route("/api/kill", methods=["POST"])
 def kill_job():
@@ -129,10 +137,11 @@ def load_transcript():
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
         print("Loaded cached transcript for video id:", video_id)
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+        compressed = lz.compressToBase64(cache_data["transcript"])
+        return jsonify({"transcript": compressed, "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
 
 if __name__ == "__main__":
-    print("🚀 Starting YouTube AI server on http://localhost:5010")
+    print("🚀 Starting YouTranscribe server on http://localhost:5010")
     app.run(port=5010)
