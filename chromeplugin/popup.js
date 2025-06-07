@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
     const reply = await sendToGPT(messages, apiKey);
-    answerDiv.innerHTML = cleanReply(reply);
+answerDiv.innerHTML = cleanReply(reply);
   }
 
   document.getElementById("chatSend").addEventListener("click", () => {
@@ -136,11 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
         suggested.appendChild(b);
       });
   }
-
   function cleanReply(text) {
     return (text || "").replace(/```(?:html)?|```/g, "").trim();
   }
-
   async function sendToGPT(messages, apiKey) {
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
