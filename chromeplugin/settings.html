@@ -6,6 +6,9 @@
 <body style="width: 420px;">
   <h2>Settings</h2>
 
+  <label for="apiKey">OpenAI API Key:</label>
+  <input type="text" id="apiKey" placeholder="sk-..." />
+
   <label for="modelSelect">Choose AI Model:</label>
   <select id="modelSelect">
     <option value="gpt-4o">GPT-4o</option>
@@ -16,20 +19,25 @@
   <button id="saveSettings">Save</button>
 
   <script>
-    const modelSelect = document.getElementById("modelSelect");
+  const modelSelect = document.getElementById("modelSelect");
+  const apiKeyInput = document.getElementById("apiKey");
 
-    chrome.storage.sync.get("model", (res) => {
-      if (res.model) {
-        modelSelect.value = res.model;
-      }
-    });
+  chrome.storage.sync.get(["model", "apiKey"], (res) => {
+    if (res.model) {
+      modelSelect.value = res.model;
+    }
+    if (res.apiKey) {
+      apiKeyInput.value = res.apiKey;
+    }
+  });
 
     document.getElementById("saveSettings").addEventListener("click", () => {
-      const selectedModel = modelSelect.value;
-      chrome.storage.sync.set({ model: selectedModel }, () => {
-        alert("Settings saved.");
-      });
+    const selectedModel = modelSelect.value;
+    const apiKey = apiKeyInput.value.trim();
+    chrome.storage.sync.set({ model: selectedModel, apiKey }, () => {
+      alert("Settings saved.");
     });
+  });
   </script>
 </body>
 </html>

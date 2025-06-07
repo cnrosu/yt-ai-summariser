@@ -2,30 +2,32 @@
 <html>
 <head>
   <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 </head>
-<body style="width: 420px;">
-
-  <!-- MAIN VIEW -->
-  <div id="mainView">
-    <h3>Transcript</h3>
-    <textarea id="transcriptBox" rows="10" readonly></textarea>
-
-    <h3>Your OpenAI API Key</h3>
-    <input type="text" id="apiKey" placeholder="sk-..." />
-
-    <button id="analyzeBtn">Analyze with GPT-4o</button>
-
-    <h3>Ask a Question</h3>
-    <div id="chatContainer">
-      <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
-      <button id="chatSend">Ask</button>
+  <body style="width: 420px;">
+    <div class="header">
+      <span class="title">YouTube AI</span>
+      <button id="settingsBtn" class="material-icons">settings</button>
     </div>
 
-    <h3>AI Summary & Takeaways</h3>
-    <div id="responseBox">No analysis yet.</div>
-  </div>
+    <textarea id="transcriptBox" rows="10" readonly class="hidden"></textarea>
 
-  <script src="lz-string.min.js"></script>
-  <script src="popup.js"></script>
-</body>
+    <div id="quickActions">
+      <button class="action-btn" data-type="summary">Summarize</button>
+      <button class="action-btn" data-type="fact">Fact Check</button>
+      <button class="action-btn" data-type="insights">Insights</button>
+    </div>
+
+    <div id="suggested" class="suggested"></div>
+
+    <div id="chatContainer">
+      <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
+      <button id="chatSend" class="material-icons">send</button>
+    </div>
+
+    <div id="qaContainer"></div>
+
+    <script src="lz-string.min.js"></script>
+    <script src="popup.js"></script>
+  </body>
 </html>
