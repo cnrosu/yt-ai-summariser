@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "YouTube AI Summarizer",
-  "description": "Transcribe and summarize YouTube videos using Whisper and GPT-4o.",
+  "name": "YouTranscribe",
+  "description": "Transcribe and analyze YouTube videos using Whisper and GPT-4o.",
   "version": "1.0",
 
   "web_accessible_resources": [

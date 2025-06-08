@@ -12,18 +12,21 @@ import shutil
 import json
 from urllib.parse import urlparse, parse_qs
 
-# Patch PATH so that Whisper can find ffmpeg.
-os.environ["PATH"] += os.pathsep + os.path.abspath("./ffmpeg/bin")
+# Patch PATH so that Whisper can find ffmpeg. Use paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FFMPEG_DIR = os.path.join(BASE_DIR, "ffmpeg", "bin")
+os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 
 app = Flask(__name__)
 
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
 
-# Persistent caching: transcripts are stored in a folder under yt-ai-summarizer/chromeplugin/transcripts.
-# The folder is defined relative to the current working directory.
-CACHE_DIR = os.path.join(os.getcwd(), "chromeplugin", "transcripts")
+# Persistent caching: transcripts are stored in chromeplugin/transcripts relative
+# to the repository root.
+CACHE_DIR = os.path.join(BASE_DIR, "chromeplugin", "transcripts")
 os.makedirs(CACHE_DIR, exist_ok=True)
+
 
 def get_cache_filename(video_id):
     """Return the full path of the cache file for the given video id."""
@@ -38,7 +41,7 @@ def process_job(job_id, url, video_id):
         subprocess.run([
             sys.executable, "-m", "yt_dlp",
             "-x", "--audio-format", "mp3",
-            "--ffmpeg-location", "./ffmpeg/bin",
+            "--ffmpeg-location", FFMPEG_DIR,
             "-o", f"{temp_dir}/%(title)s.%(ext)s",
             url
         ], check=True)
@@ -108,7 +111,9 @@ def job_status():
     job_id = request.args.get("jobId")
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify(jobs[job_id])
+    job = jobs[job_id].copy()
+    # Return transcript plain; compression handled on the client if needed
+    return jsonify(job)
 
 @app.route("/api/kill", methods=["POST"])
 def kill_job():
@@ -134,5 +139,5 @@ def load_transcript():
         return jsonify({"error": "Transcript not found"}), 404
 
 if __name__ == "__main__":
-    print("🚀 Starting YouTube AI server on http://localhost:5010")
+    print("🚀 Starting YouTranscribe server on http://localhost:5010")
     app.run(port=5010)
