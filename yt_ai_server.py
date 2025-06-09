@@ -11,6 +11,7 @@ import threading
 import shutil
 import json
 from urllib.parse import urlparse, parse_qs
+from lzstring import LZString
 
 # Patch PATH so that Whisper can find ffmpeg. Use paths relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +28,8 @@ jobs = {}
 CACHE_DIR = os.path.join(BASE_DIR, "chromeplugin", "transcripts")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+# Used to compress transcripts before sending to the extension
+lz = LZString()
 
 def get_cache_filename(video_id):
     """Return the full path of the cache file for the given video id."""
@@ -98,7 +101,8 @@ def start_transcription():
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
         print("Found cached transcript for video ID:", video_id)
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+        compressed = lz.compressToBase64(cache_data["transcript"])
+        return jsonify({"transcript": compressed, "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "queued"}
@@ -112,7 +116,8 @@ def job_status():
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
     job = jobs[job_id].copy()
-    # Return transcript plain; compression handled on the client if needed
+    if job.get("transcript"):
+        job["transcript"] = lz.compressToBase64(job["transcript"])
     return jsonify(job)
 
 @app.route("/api/kill", methods=["POST"])
@@ -134,7 +139,8 @@ def load_transcript():
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
         print("Loaded cached transcript for video id:", video_id)
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+        compressed = lz.compressToBase64(cache_data["transcript"])
+        return jsonify({"transcript": compressed, "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
 
