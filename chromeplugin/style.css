@@ -1,6 +1,8 @@
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Roboto', Arial, sans-serif;
   padding: 10px;
+  background: #fff;
+  color: #202124;
 }
 
 textarea, input, select, button {
@@ -10,12 +12,51 @@ textarea, input, select, button {
   box-sizing: border-box;
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 500;
+}
+
 button {
   padding: 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .hidden {
   display: none;
+}
+
+#quickActions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  background-color: #1a73e8;
+  color: white;
+}
+
+#suggested button {
+  background-color: #e8eaed;
+  color: #202124;
+  margin: 4px 4px 0 0;
+}
+
+.card {
+  background: #f1f3f4;
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 4px;
 }
 
 #responseBox {
@@ -33,10 +74,7 @@ button {
 
 
 #settingsBtn {
-  float: right;
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 18px;
+  font-size: 20px;
   background: none;
   border: none;
   cursor: pointer;
