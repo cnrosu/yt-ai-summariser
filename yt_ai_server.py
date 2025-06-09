@@ -13,21 +13,20 @@ import json
 from urllib.parse import urlparse, parse_qs
 from lzstring import LZString
 
-# Patch PATH so that Whisper can find ffmpeg.
-os.environ["PATH"] += os.pathsep + os.path.abspath("./ffmpeg/bin")
+# Patch PATH so that Whisper can find ffmpeg. Use paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FFMPEG_DIR = os.path.join(BASE_DIR, "ffmpeg", "bin")
+os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 
 app = Flask(__name__)
 
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
 
-# Persistent caching: transcripts are stored in a folder under yt-ai-summarizer/chromeplugin/transcripts.
-# The folder is defined relative to the current working directory.
-CACHE_DIR = os.path.join(os.getcwd(), "chromeplugin", "transcripts")
+# Persistent caching: transcripts are stored in chromeplugin/transcripts relative
+# to the repository root.
+CACHE_DIR = os.path.join(BASE_DIR, "chromeplugin", "transcripts")
 os.makedirs(CACHE_DIR, exist_ok=True)
-
-# Used to compress transcripts before sending to the extension
-lz = LZString()
 
 def get_cache_filename(video_id):
     """Return the full path of the cache file for the given video id."""
@@ -42,7 +41,7 @@ def process_job(job_id, url, video_id):
         subprocess.run([
             sys.executable, "-m", "yt_dlp",
             "-x", "--audio-format", "mp3",
-            "--ffmpeg-location", "./ffmpeg/bin",
+            "--ffmpeg-location", FFMPEG_DIR,
             "-o", f"{temp_dir}/%(title)s.%(ext)s",
             url
         ], check=True)

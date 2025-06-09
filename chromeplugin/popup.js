@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
     const reply = await sendToGPT(messages, apiKey);
-answerDiv.innerHTML = cleanReply(reply);
+    answerDiv.innerHTML = cleanReply(reply);
   }
 
   document.getElementById("chatSend").addEventListener("click", () => {
@@ -107,6 +107,8 @@ answerDiv.innerHTML = cleanReply(reply);
       } else {
         transcriptBox.value = "Error decompressing transcript.";
       }
+      transcriptBox.value = transcript;
+      generateSuggestions();
     });
   }
 
