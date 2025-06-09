@@ -100,10 +100,12 @@ document.addEventListener("DOMContentLoaded", () => {
         transcriptBox.value = "Transcript not found. Try reloading.";
         return;
       }
-      let transcript = LZString.decompressFromUTF16(compressed);
-      if (transcript === null) {
-        // Fall back for data saved without compression
-        transcript = compressed;
+      const transcript = LZString.decompressFromUTF16(compressed);
+      if (transcript) {
+        transcriptBox.value = transcript;
+        generateSuggestions();
+      } else {
+        transcriptBox.value = "Error decompressing transcript.";
       }
       transcriptBox.value = transcript;
       generateSuggestions();
@@ -136,11 +138,9 @@ document.addEventListener("DOMContentLoaded", () => {
         suggested.appendChild(b);
       });
   }
-
   function cleanReply(text) {
     return (text || "").replace(/```(?:html)?|```/g, "").trim();
   }
-
   async function sendToGPT(messages, apiKey) {
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
