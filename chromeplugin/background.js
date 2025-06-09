@@ -1,4 +1,4 @@
-importScripts("lz-string.min.js");
+importScripts("lz-string.min.js", "lz-utils.js");
 
 // Global mapping: store active job info per tab.
 const activeJobs = {};
@@ -48,7 +48,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (data.cached) {
               console.log("Server returned cached transcript for video:", videoId);
               updateUI(tabId, "Done!", "green");
-              const transcript = LZString.decompressFromBase64(data.transcript);
+              const transcript = safeDecompressFromBase64(data.transcript);
               const compressed = LZString.compressToUTF16(transcript);
               chrome.storage.local.set({ [`transcript_${videoId}`]: compressed }, () => {
                 console.log(`Saved transcript for video ${videoId} in chrome storage from server cache.`);
@@ -73,7 +73,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     clearInterval(pollInterval);
                     delete activeJobs[tabId];
                     updateUI(tabId, "Done!", "green");
-                    const transcript = LZString.decompressFromBase64(statusData.transcript);
+                    const transcript = safeDecompressFromBase64(statusData.transcript);
                     const compressed = LZString.compressToUTF16(transcript);
                     chrome.storage.local.set({ [`transcript_${videoId}`]: compressed }, () => {
                       console.log(`Compressed and saved transcript under transcript_${videoId}`);

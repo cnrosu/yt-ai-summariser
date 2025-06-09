@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from werkzeug.exceptions import BadRequest
 import sys
 import subprocess
 import whisper
@@ -11,7 +12,6 @@ import threading
 import shutil
 import json
 from urllib.parse import urlparse, parse_qs
-from lzstring import LZString
 
 # Patch PATH so that Whisper can find ffmpeg. Use paths relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,9 +64,15 @@ def process_job(job_id, url, video_id):
         # Save the transcript persistently as a JSON file.
         cache_data = {"video_id": video_id, "transcript": transcript}
         cache_filename = get_cache_filename(video_id)
-        with open(cache_filename, "w", encoding="utf-8") as f:
-            json.dump(cache_data, f)
-        print("Cached transcript to", cache_filename)
+        try:
+            with open(cache_filename, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f)
+            print("Cached transcript to", cache_filename)
+        except Exception as dump_err:
+            print("Failed to write cache file:", dump_err)
+            jobs[job_id]['status'] = "error"
+            jobs[job_id]['error'] = f"Failed to save transcript: {dump_err}"
+            return
 
         os.remove(audio_file)
         shutil.rmtree(temp_dir)
@@ -83,7 +89,12 @@ def process_job(job_id, url, video_id):
 
 @app.route("/api/transcribe", methods=["POST"])
 def start_transcription():
-    data = request.get_json()
+    try:
+        data = request.get_json()
+    except BadRequest:
+        return jsonify({"error": "Invalid JSON body"}), 400
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid JSON body"}), 400
     url = data.get("url")
     if not url:
         return jsonify({"error": "URL is required"}), 400
@@ -95,11 +106,13 @@ def start_transcription():
     # Check if a cached transcript exists.
     cache_filename = get_cache_filename(video_id)
     if os.path.isfile(cache_filename):
-        with open(cache_filename, "r", encoding="utf-8") as f:
-            cache_data = json.load(f)
+        try:
+            with open(cache_filename, "r", encoding="utf-8") as f:
+                cache_data = json.load(f)
+        except json.JSONDecodeError:
+            return jsonify({"error": "Cached transcript is corrupted"}), 500
         print("Found cached transcript for video ID:", video_id)
-        compressed = lz.compressToBase64(cache_data["transcript"])
-        return jsonify({"transcript": compressed, "cached": True})
+        return jsonify({"transcript": cache_data["transcript"], "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "queued"}
@@ -113,8 +126,6 @@ def job_status():
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
     job = jobs[job_id].copy()
-    if job.get("transcript"):
-        job["transcript"] = lz.compressToBase64(job["transcript"])
     return jsonify(job)
 
 @app.route("/api/kill", methods=["POST"])
@@ -133,11 +144,13 @@ def load_transcript():
         return jsonify({"error": "videoId parameter is required"}), 400
     cache_filename = get_cache_filename(video_id)
     if os.path.isfile(cache_filename):
-        with open(cache_filename, "r", encoding="utf-8") as f:
-            cache_data = json.load(f)
+        try:
+            with open(cache_filename, "r", encoding="utf-8") as f:
+                cache_data = json.load(f)
+        except json.JSONDecodeError:
+            return jsonify({"error": "Cached transcript is corrupted"}), 500
         print("Loaded cached transcript for video id:", video_id)
-        compressed = lz.compressToBase64(cache_data["transcript"])
-        return jsonify({"transcript": compressed, "cached": True})
+        return jsonify({"transcript": cache_data["transcript"], "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
 

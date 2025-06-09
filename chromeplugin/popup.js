@@ -100,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         transcriptBox.value = "Transcript not found. Try reloading.";
         return;
       }
-      const transcript = LZString.decompressFromUTF16(compressed);
+      const transcript = safeDecompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
         generateSuggestions();
