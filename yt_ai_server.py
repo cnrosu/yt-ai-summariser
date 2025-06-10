@@ -19,6 +19,10 @@ os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 
 app = Flask(__name__)
 
+print("Loading Whisper model once at startup...")
+# Load the base model on GPU if available
+WHISPER_MODEL = whisper.load_model("base", device="cuda")
+
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
 
@@ -51,10 +55,8 @@ def process_job(job_id, url, video_id):
         audio_file = mp3_files[0]
         print("Found audio file:", audio_file)
         jobs[job_id]['status'] = "transcribing"
-        print("Loading Whisper model...")
-        model = whisper.load_model("base")
         print("Starting transcription...")
-        result = model.transcribe(audio_file)
+        result = WHISPER_MODEL.transcribe(audio_file)
         transcript = result["text"]
         print("Transcription complete.")
         jobs[job_id]['status'] = "done"
