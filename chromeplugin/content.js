@@ -86,7 +86,7 @@ function loadCachedTranscript() {
     .then(data => {
       if (data.cached && data.transcript) {
         console.log("Cached transcript loaded.");
-        const text = LZString.decompressFromBase64(data.transcript);
+        const text = data.transcript;
         const compressed = LZString.compressToUTF16(text);
         chrome.storage.local.set({ [`transcript_${videoId}`]: compressed }, () => {
           console.log(`Transcript for video ${videoId} saved in chrome storage.`);
