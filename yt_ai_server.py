@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import sys
 import subprocess
 import whisper
+import torch
 import os
 import tempfile
 import glob
@@ -20,8 +21,9 @@ os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 app = Flask(__name__)
 
 print("Loading Whisper model once at startup...")
-# Load the base model on GPU if available
-WHISPER_MODEL = whisper.load_model("base", device="cuda")
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+WHISPER_MODEL = whisper.load_model("base", device=DEVICE)
+print("Whisper model loaded on", DEVICE)
 
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
