@@ -19,6 +19,10 @@ os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 
 app = Flask(__name__)
 
+print("Loading Whisper model once at startup...")
+# Load the base model on GPU if available
+WHISPER_MODEL = whisper.load_model("base", device="cuda")
+
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
 
@@ -51,10 +55,8 @@ def process_job(job_id, url, video_id):
         audio_file = mp3_files[0]
         print("Found audio file:", audio_file)
         jobs[job_id]['status'] = "transcribing"
-        print("Loading Whisper model...")
-        model = whisper.load_model("base")
         print("Starting transcription...")
-        result = model.transcribe(audio_file)
+        result = WHISPER_MODEL.transcribe(audio_file)
         transcript = result["text"]
         print("Transcription complete.")
         jobs[job_id]['status'] = "done"
@@ -96,7 +98,8 @@ def start_transcription():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
-        print("Found cached transcript for video ID:", video_id)
+        print("Found cached transcript for video ID:", video_id,
+              "len=", len(cache_data["transcript"]))
         return jsonify({"transcript": cache_data["transcript"], "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
@@ -111,6 +114,9 @@ def job_status():
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
     job = jobs[job_id].copy()
+    print("Status check", job_id, job.get("status"))
+    if job.get("status") == "done" and job.get("transcript"):
+        print("Returning transcript length", len(job["transcript"]))
     return jsonify(job)
 
 @app.route("/api/kill", methods=["POST"])
@@ -131,7 +137,8 @@ def load_transcript():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
-        print("Loaded cached transcript for video id:", video_id)
+        print("Loaded cached transcript for video id:", video_id,
+              "len=", len(cache_data["transcript"]))
         return jsonify({"transcript": cache_data["transcript"], "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
