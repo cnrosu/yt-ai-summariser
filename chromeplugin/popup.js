@@ -23,10 +23,15 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleQuestion(question) {
     const apiKey = storedApiKey;
     const transcript = transcriptBox.value.trim();
-    if (!question || !apiKey || !transcript || transcript.startsWith("Transcript not found")) {
-      alert("Please ensure transcript is loaded and your API key is saved in settings.");
+    if (!apiKey) {
+      alert("Missing API key. Please enter it on the settings page.");
       return;
     }
+    if (!transcript || transcript.startsWith("Transcript not found")) {
+      alert("Transcript not loaded yet. Try transcribing the video first.");
+      return;
+    }
+    if (!question) return;
     const details = document.createElement("details");
     details.className = "card";
     const summary = document.createElement("summary");
