@@ -7,7 +7,7 @@ All endpoints are prefixed with `/api` and by default the server listens on `htt
 ## Architecture Overview
 
 ```
-Chrome Extension <--HTTP--> Flask Server -- Whisper & yt_dlp --> Transcripts
+Chrome Extension <--HTTP--> Flask Server -- faster-whisper & yt_dlp --> Transcripts
                                  |
                                  +-- Local cache (per video)
                                  +-- Saved Q&A pairs
@@ -18,7 +18,7 @@ Chrome Extension <--HTTP--> Flask Server -- Whisper & yt_dlp --> Transcripts
    - Sends requests to the local Flask server to transcribe videos and store question/answer pairs.
 2. **Flask server** (`yt_ai_server.py`)
    - Downloads audio using `yt_dlp` and converts it to MP3 using a bundled `ffmpeg`.
-   - Runs the Whisper model once at startup to transcribe audio.
+   - Runs the faster-whisper model once at startup to transcribe audio.
    - Caches the transcript and any generated Q&A pairs in `chromeplugin/transcripts/<video_id>/`.
    - Exposes a small REST API for the extension.
 
@@ -64,7 +64,7 @@ Retrieve the status of a transcription job.
 ```
 
 ### `POST /api/kill?jobId=<id>`
-Cancel a running job. The server marks the job as killed but does not forcibly terminate the Whisper process. Returns:
+Cancel a running job. The server marks the job as killed but does not forcibly terminate the faster-whisper process. Returns:
 ```json
 { "success": true, "status": "cancelled" }
 ```
@@ -99,9 +99,9 @@ All saved Q&A pairs are appended as JSON lines to `<video_id>_qa.txt` inside the
 
 ## Running the Server
 
-Install the dependencies listed in `setup_yt_ai.ps1` or run the setup scripts for your platform. Then execute:
+Install Python 3.10 and install the packages from `requirements.txt` (or run the `setup_yt_ai.ps1` script). Then execute:
 ```bash
 python yt_ai_server.py
 ```
-The server will load the Whisper model on startup and listen on port `5010`.
+The server will load the faster-whisper model on startup and listen on port `5010`.
 

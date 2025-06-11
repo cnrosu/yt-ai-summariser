@@ -15,7 +15,7 @@ if ($versionOutput -notlike "*3.10*") {
 Write-Host "✅ Python version OK: $versionOutput" -ForegroundColor Green
 
 # 2. Install required pip packages
-$pipPackages = @("yt-dlp", "openai-whisper", "ffmpeg-python", "flask", "requests")
+$pipPackages = @("yt-dlp", "faster-whisper", "ffmpeg-python", "flask", "requests")
 Write-Host "`n📦 Installing Python packages..." -ForegroundColor Cyan
 foreach ($pkg in $pipPackages) {
     & $py -m pip install --upgrade $pkg
@@ -50,17 +50,16 @@ if (!(Test-Path $ffmpegBin)) {
 }
 & $ffmpegBin -version
 
-# 5. Trigger whisper model download
+
+$pyCommand = "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu')"
+# 5. Trigger faster-whisper model download
 Write-Host "`n📥 Downloading Whisper model..." -ForegroundColor Cyan
-$dummy = "dummy.wav"
-[IO.File]::WriteAllBytes($dummy, [byte[]](0x52,0x49,0x46,0x46,0x24,0x00,0x00,0x00,0x57,0x41,0x56,0x45,0x66,0x6D,0x74,0x20,0x10,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x44,0xAC,0x00,0x00,0x44,0xAC,0x00,0x00,0x01,0x00,0x08,0x00,0x64,0x61,0x74,0x61,0x00,0x00,0x00,0x00))
 
 try {
-    & $py -m whisper $dummy --model base.en --fp16 False --output_dir models --language en
+    & $py -c $pyCommand
 } catch {
     Write-Warning "⚠️ Whisper model download failed (likely due to dummy input, which is okay)"
 } finally {
-    Remove-Item $dummy -Force
     Write-Host "✅ Whisper base.en model cached." -ForegroundColor Green
 }
 
