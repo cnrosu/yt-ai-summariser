@@ -11,22 +11,59 @@
       <button id="settingsBtn" class="material-icons">settings</button>
     </div>
 
-    <textarea id="transcriptBox" rows="10" readonly class="hidden"></textarea>
-
-    <div id="quickActions">
-      <button class="action-btn" data-type="summary">Summarize</button>
-      <button class="action-btn" data-type="fact">Fact Check</button>
-      <button class="action-btn" data-type="insights">Insights</button>
+    <div class="tab-nav">
+      <button class="tab-link active" data-tab="chatTab">Chat</button>
+      <button class="tab-link" data-tab="settingsTab">Settings</button>
+      <button class="tab-link" data-tab="agentsTab">Agents</button>
     </div>
 
-    <div id="suggested" class="suggested"></div>
+    <div id="chatTab" class="tab-content">
+      <textarea id="transcriptBox" rows="10" readonly class="hidden"></textarea>
 
-    <div id="chatContainer">
-      <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
-      <button id="chatSend" class="material-icons">send</button>
+      <div id="quickActions">
+        <button class="action-btn" data-type="summary">Summarize</button>
+        <button class="action-btn" data-type="fact">Fact Check</button>
+        <button class="action-btn" data-type="insights">Insights</button>
+      </div>
+
+      <div id="suggested" class="suggested"></div>
+
+      <div id="chatContainer">
+        <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
+        <button id="chatSend" class="material-icons">send</button>
+      </div>
+
+      <div id="qaContainer"></div>
     </div>
 
-    <div id="qaContainer"></div>
+    <div id="settingsTab" class="tab-content hidden">
+      <label for="apiKey">OpenAI API Key:</label>
+      <input type="password" id="apiKey" placeholder="sk-..." />
+
+      <label for="keyLocation">Store API key in:</label>
+      <select id="keyLocation">
+        <option value="sync">Chrome Sync</option>
+        <option value="local">Local Only</option>
+      </select>
+
+      <label for="modelSelect">Choose AI Model:</label>
+      <select id="modelSelect">
+        <option value="gpt-4o">GPT-4o</option>
+        <option value="gpt-4">GPT-4</option>
+        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+      </select>
+
+      <button id="saveSettings">Save</button>
+      <span id="statusMsg" style="margin-left:10px;color:green;display:none;">Saved!</span>
+    </div>
+
+    <div id="agentsTab" class="tab-content hidden">
+      <label for="assistantId">Assistant ID:</label>
+      <input type="text" id="assistantId" placeholder="asst_..." />
+      <button id="createAssistant">Create Standard Assistant</button>
+      <button id="saveAgent">Save</button>
+      <span id="agentStatus" style="margin-left:10px;color:green;display:none;">Saved!</span>
+    </div>
 
     <script src="lz-string.min.js"></script>
     <script src="popup.js"></script>
