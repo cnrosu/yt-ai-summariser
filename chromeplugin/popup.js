@@ -6,6 +6,103 @@ let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
 
+async function loadAssistants(apiKey) {
+  const container = document.getElementById("agentList");
+  if (!container || !apiKey) return;
+  container.innerHTML = "";
+  try {
+    const res = await fetch("https://api.openai.com/v1/assistants?limit=100", {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "OpenAI-Beta": "assistants=v2",
+      },
+    });
+    const data = await res.json();
+    (data.data || []).forEach((a) => {
+      const details = document.createElement("details");
+      details.className = "card";
+      const summary = document.createElement("summary");
+      summary.textContent = a.name || a.id;
+      details.appendChild(summary);
+      const info = document.createElement("div");
+      info.textContent = "";
+      details.appendChild(info);
+      details.addEventListener("toggle", async () => {
+        if (!details.open || info.dataset.loaded) return;
+        const d = await fetch(`https://api.openai.com/v1/assistants/${a.id}`, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "OpenAI-Beta": "assistants=v2",
+          },
+        });
+        const full = await d.json();
+        info.innerHTML = `<p><b>Description:</b> ${full.description || ""}</p>` +
+          `<p><b>Instructions:</b> ${full.instructions || ""}</p>` +
+          `<p><b>Model:</b> ${full.model}</p>` +
+          `<p><b>Temperature:</b> ${full.temperature ?? ""}</p>` +
+          `<p><b>Top P:</b> ${full.top_p ?? ""}</p>`;
+        info.dataset.loaded = "1";
+      });
+      summary.addEventListener("click", () => {
+        chrome.storage.sync.set({ assistantId: a.id }, () => {
+          assistantId = a.id;
+          const input = document.getElementById("assistantId");
+          if (input) input.value = a.id;
+          const status = document.getElementById("agentStatus");
+          if (status) {
+            status.textContent = "Saved!";
+            status.style.display = "inline";
+            setTimeout(() => (status.style.display = "none"), 1500);
+          }
+        });
+      });
+      container.appendChild(details);
+    });
+  } catch (err) {
+    console.error("Failed to load assistants", err);
+  }
+}
+
+async function createCustomAssistant(apiKey) {
+  const body = {
+    model: document.getElementById("newModel").value,
+    name: document.getElementById("newName").value.trim(),
+    description: document.getElementById("newDescription").value.trim(),
+    instructions: document.getElementById("newInstructions").value.trim(),
+    temperature: parseFloat(document.getElementById("newTemp").value),
+    top_p: parseFloat(document.getElementById("newTopP").value),
+    response_format: { type: document.getElementById("newResponseFormat").value },
+    metadata: { reasoning_effort: document.getElementById("newReasoning").value },
+    tools: Array.from(document.querySelectorAll("input[name='tool']:checked"))
+      .map((c) => ({ type: c.value })),
+  };
+  try {
+    const res = await fetch("https://api.openai.com/v1/assistants", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "OpenAI-Beta": "assistants=v2",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.id) {
+      await loadAssistants(apiKey);
+      const status = document.getElementById("agentStatus");
+      if (status) {
+        status.textContent = "Assistant created!";
+        status.style.display = "inline";
+        setTimeout(() => (status.style.display = "none"), 1500);
+      }
+    } else {
+      alert("Failed to create assistant.");
+    }
+  } catch (err) {
+    console.error("Failed to create assistant", err);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const transcriptBox = document.getElementById("transcriptBox");
   const qaContainer = document.getElementById("qaContainer");
@@ -49,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
         storedApiKey = r.apiKey;
         const keyInput = document.getElementById("apiKey");
         if (keyInput) keyInput.value = r.apiKey;
+        await loadAssistants(r.apiKey);
         if (!assistantId) {
           console.log("No assistant ID found, creating standard assistant");
           assistantId = await createStandardAssistant(r.apiKey);
@@ -56,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
             chrome.storage.sync.set({ assistantId });
             console.log("Stored new Assistant ID", assistantId);
           }
+        }
         if (transcriptBox.value.trim()) {
           generateSuggestions();
         }
@@ -65,6 +164,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("settingsBtn").addEventListener("click", () => {
     switchTab("settingsTab");
+  });
+
+  document.getElementById("newTemp")?.addEventListener("input", (e) => {
+    document.getElementById("tempVal").textContent = e.target.value;
+  });
+  document.getElementById("newTopP")?.addEventListener("input", (e) => {
+    document.getElementById("topPVal").textContent = e.target.value;
   });
 
   function showCopyPopup(el) {
@@ -220,26 +326,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  document.getElementById("createAssistant")?.addEventListener("click", async () => {
+  document.getElementById("createCustomAssistant")?.addEventListener("click", async () => {
     const apiKey = storedApiKey || document.getElementById("apiKey").value.trim();
     if (!apiKey) {
       alert("Enter your API key first.");
       return;
     }
-    const id = await createStandardAssistant(apiKey);
-    if (id) {
-      document.getElementById("assistantId").value = id;
-      chrome.storage.sync.set({ assistantId: id }, () => {
-        assistantId = id;
-        if (agentStatus) {
-          agentStatus.textContent = "Assistant created!";
-          agentStatus.style.display = "inline";
-          setTimeout(() => (agentStatus.style.display = "none"), 1500);
-        }
-      });
-    } else {
-      alert("Failed to create assistant.");
-    }
+    await createCustomAssistant(apiKey);
   });
 
   function getVideoId(callback) {
@@ -475,6 +568,10 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Failed to create assistant", err);
       return null;
     }
+  }
+
+  async function createStandardAssistant(apiKey) {
+    return createAssistant(apiKey, DEFAULT_ASSISTANT_NAME);
   }
 
   async function ensureDefaultAssistant(apiKey) {
