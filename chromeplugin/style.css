@@ -258,3 +258,33 @@ details[open] .copy-icon {
 .tab-content.hidden {
   display: none;
 }
+
+.sub-tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sub-tab-link {
+  flex: 1;
+  padding: 4px;
+  background: #e8eaed;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+
+.sub-tab-link.active {
+  background: #fff;
+  border-bottom: 2px solid #1a73e8;
+}
+
+.sub-tab-content.hidden {
+  display: none;
+}
+
+.select-agent-btn {
+  margin-top: 8px;
+  background-color: #1a73e8;
+  color: #fff;
+}
