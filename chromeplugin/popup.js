@@ -8,13 +8,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatInput = document.getElementById("chatInput");
   const suggested = document.getElementById("suggested");
 
-  chrome.storage.sync.get(["apiKey", "model"], (res) => {
-    if (res.apiKey) {
-      storedApiKey = res.apiKey;
-    }
+  chrome.storage.sync.get(["model", "keyLocation"], (res) => {
     if (res.model) {
       currentModel = res.model;
     }
+    const location = res.keyLocation || "sync";
+    const storage = location === "local" ? chrome.storage.local : chrome.storage.sync;
+    storage.get(["apiKey"], (r) => {
+      if (r.apiKey) {
+        storedApiKey = r.apiKey;
+      }
+    });
   });
 
   document.getElementById("settingsBtn").addEventListener("click", () => {
@@ -122,7 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function loadQA(videoId) {
     const key = `qa_${videoId}`;
-    chrome.storage.sync.get(key, (res) => {
+    chrome.storage.local.get(key, (res) => {
       const arr = res[key] || [];
       arr.forEach((item) => {
         const details = document.createElement("details");
@@ -141,10 +145,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function saveQA(question, answer) {
     if (!currentVideoId) return;
     const key = `qa_${currentVideoId}`;
-    chrome.storage.sync.get(key, (res) => {
+    chrome.storage.local.get(key, (res) => {
       const arr = res[key] || [];
       arr.push({ question, answer });
-      chrome.storage.sync.set({ [key]: arr });
+      chrome.storage.local.set({ [key]: arr });
     });
     fetch("http://localhost:5010/api/save_qa", {
       method: "POST",
