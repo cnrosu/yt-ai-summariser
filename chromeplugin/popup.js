@@ -6,6 +6,19 @@ let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
 
+function showApiError(action, data, el) {
+  console.error(`${action} API error`, data);
+  const msg = `Failed to ${action}: ` +
+    (data.error?.message || JSON.stringify(data));
+  if (el) {
+    el.style.color = "red";
+    el.textContent = msg;
+    el.style.display = "inline";
+  } else {
+    alert(msg);
+  }
+}
+
 async function loadAssistants(apiKey) {
   const container = document.getElementById("agentList");
   if (!container || !apiKey) return;
@@ -18,6 +31,10 @@ async function loadAssistants(apiKey) {
       },
     });
     const data = await res.json();
+    if (!res.ok) {
+      showApiError("load assistants", data);
+      return;
+    }
     (data.data || []).forEach((a) => {
       const details = document.createElement("details");
       details.className = "card";
@@ -27,6 +44,23 @@ async function loadAssistants(apiKey) {
       const info = document.createElement("div");
       info.textContent = "";
       details.appendChild(info);
+      const selectBtn = document.createElement("button");
+      selectBtn.className = "select-agent-btn";
+      selectBtn.textContent = "Select Agent";
+      selectBtn.addEventListener("click", () => {
+        chrome.storage.sync.set({ assistantId: a.id }, () => {
+          assistantId = a.id;
+          const input = document.getElementById("assistantId");
+          if (input) input.value = a.id;
+          const status = document.getElementById("agentStatus");
+          if (status) {
+            status.textContent = "Saved!";
+            status.style.display = "inline";
+            setTimeout(() => (status.style.display = "none"), 1500);
+          }
+        });
+      });
+      info.appendChild(selectBtn);
       details.addEventListener("toggle", async () => {
         if (!details.open || info.dataset.loaded) return;
         const d = await fetch(`https://api.openai.com/v1/assistants/${a.id}`, {
@@ -43,19 +77,6 @@ async function loadAssistants(apiKey) {
           `<p><b>Top P:</b> ${full.top_p ?? ""}</p>`;
         info.dataset.loaded = "1";
       });
-      summary.addEventListener("click", () => {
-        chrome.storage.sync.set({ assistantId: a.id }, () => {
-          assistantId = a.id;
-          const input = document.getElementById("assistantId");
-          if (input) input.value = a.id;
-          const status = document.getElementById("agentStatus");
-          if (status) {
-            status.textContent = "Saved!";
-            status.style.display = "inline";
-            setTimeout(() => (status.style.display = "none"), 1500);
-          }
-        });
-      });
       container.appendChild(details);
     });
   } catch (err) {
@@ -64,6 +85,8 @@ async function loadAssistants(apiKey) {
 }
 
 async function createCustomAssistant(apiKey) {
+  const status = document.getElementById("createStatus");
+  if (status) status.style.display = "none";
   const body = {
     model: document.getElementById("newModel").value,
     name: document.getElementById("newName").value.trim(),
@@ -87,19 +110,28 @@ async function createCustomAssistant(apiKey) {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+    if (!res.ok) {
+      showApiError("create assistant", data, status);
+      return;
+    }
     if (data.id) {
       await loadAssistants(apiKey);
-      const status = document.getElementById("agentStatus");
       if (status) {
+        status.style.color = "green";
         status.textContent = "Assistant created!";
         status.style.display = "inline";
         setTimeout(() => (status.style.display = "none"), 1500);
       }
     } else {
-      alert("Failed to create assistant.");
+      showApiError("create assistant", data, status);
     }
   } catch (err) {
     console.error("Failed to create assistant", err);
+    if (status) {
+      status.style.color = "red";
+      status.textContent = "Failed to create assistant.";
+      status.style.display = "inline";
+    }
   }
 }
 
@@ -121,9 +153,27 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btn) btn.classList.add("active");
   }
 
+  function switchSubTab(id) {
+    document.querySelectorAll("#agentsTab .sub-tab-content").forEach((div) =>
+      div.classList.add("hidden")
+    );
+    document.getElementById(id).classList.remove("hidden");
+    document.querySelectorAll("#agentsTab .sub-tab-link").forEach((b) =>
+      b.classList.remove("active")
+    );
+    const btn = document.querySelector(
+      `#agentsTab .sub-tab-link[data-sub-tab="${id}"]`
+    );
+    if (btn) btn.classList.add("active");
+  }
+
   document.querySelectorAll(".tab-link").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+
+  document
+    .querySelectorAll("#agentsTab .sub-tab-link")
+    .forEach((btn) => btn.addEventListener("click", () => switchSubTab(btn.dataset.subTab)));
 
   chrome.storage.sync.get(["model", "keyLocation", "assistantId"], (res) => {
     if (res.model) {
