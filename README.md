@@ -28,6 +28,9 @@ Transcripts are cached per video on disk and in the browser. Any questions you a
    ```
    The API is now available on `http://localhost:5010` by default.
 5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
+6. Generate a ChatGPT API key by visiting [OpenAI's API key page](https://platform.openai.com/api-keys).
+   Open the extension on any YouTube video and click the **cogwheel** icon to go
+   to the settings page, then paste your key into the **OpenAI API Key** field.
 
 See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for details on the available endpoints and how to run the server. For information about the automated test suite see [docs/TESTING.md](docs/TESTING.md).
 
