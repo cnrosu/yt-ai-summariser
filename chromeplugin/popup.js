@@ -40,7 +40,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const details = document.createElement("details");
     details.className = "card";
     const summary = document.createElement("summary");
-    summary.textContent = question;
+    summary.textContent = question + " ";
+    const loader = document.createElement("span");
+    loader.className = "loader";
+    summary.appendChild(loader);
     const answerDiv = document.createElement("div");
     answerDiv.innerHTML = "Loading...";
     details.appendChild(summary);
@@ -60,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const reply = await sendToGPT(messages, apiKey);
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
+    summary.removeChild(loader);
     saveQA(question, clean);
   }
 
