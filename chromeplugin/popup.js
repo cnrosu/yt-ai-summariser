@@ -562,6 +562,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       const data = await res.json();
       console.log("Assistant API response", data);
+      if (!res.ok) {
+        console.error("Assistant API error", data);
+        alert(
+          "Failed to create assistant: " +
+            (data.error?.message || JSON.stringify(data))
+        );
+        return null;
+      }
       if (data.id) console.log("Created assistant ID", data.id);
       return data.id || null;
     } catch (err) {
