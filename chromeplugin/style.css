@@ -40,6 +40,11 @@ button:active {
   display: none;
 }
 
+.section-title {
+  margin: 10px 0 4px;
+  font-size: 15px;
+}
+
 #quickActions {
   display: flex;
   gap: 6px;
@@ -116,6 +121,19 @@ details[open] .copy-icon {
 }
 
 .copy-icon:hover {
+  opacity: 1;
+}
+
+.delete-icon {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+.delete-icon:hover {
   opacity: 1;
 }
 
