@@ -1,4 +1,10 @@
+let playerInterval = null;
+
 function addTranscribeButton() {
+  if (playerInterval) {
+    clearInterval(playerInterval);
+    playerInterval = null;
+  }
   // Remove any stale container.
   const existingContainer = document.getElementById("yt-ai-container");
   if (existingContainer) {
@@ -62,11 +68,12 @@ function addTranscribeButton() {
   container.appendChild(closeBtn);
 
   // Insert the container when the YouTube player is ready.
-  const checkPlayerInterval = setInterval(() => {
+  playerInterval = setInterval(() => {
     const player = document.querySelector(".html5-video-player");
     if (player) {
       player.appendChild(container);
-      clearInterval(checkPlayerInterval);
+      clearInterval(playerInterval);
+      playerInterval = null;
     }
   }, 500);
 }
