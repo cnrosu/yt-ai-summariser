@@ -28,16 +28,25 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
   });
 
+  function showCopyPopup(el) {
+    const popup = document.createElement("span");
+    popup.className = "copy-popup";
+    popup.textContent = "\ud83d\udccb Copied";
+    el.appendChild(popup);
+    popup.addEventListener("animationend", () => popup.remove(), { once: true });
+  }
+
   function attachInteractions(details, answerDiv) {
     let startX;
     let timer;
     const copyIcon = document.createElement("span");
     copyIcon.className = "copy-icon";
-    copyIcon.textContent = "📋";
+    copyIcon.textContent = "\ud83d\udccb";
     copyIcon.title = "Copy";
     copyIcon.addEventListener("click", () => {
       navigator.clipboard.writeText(answerDiv.innerText || "").catch(() => {});
       details.classList.add("copied");
+      showCopyPopup(details);
       setTimeout(() => details.classList.remove("copied"), 800);
     });
     details.appendChild(copyIcon);
@@ -46,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
       timer = setTimeout(() => {
         navigator.clipboard.writeText(answerDiv.innerText || "").catch(() => {});
         details.classList.add("copied");
+        showCopyPopup(details);
         setTimeout(() => details.classList.remove("copied"), 800);
       }, 600);
     });
