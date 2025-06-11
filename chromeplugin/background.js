@@ -1,6 +1,6 @@
 importScripts("lz-string.min.js");
 
-// Global mapping: store active job info per tab.
+// Global mapping: track active job IDs per tab. Polling now happens in content.js.
 const activeJobs = {};
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -21,9 +21,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("Transcript found in chrome local storage for video:", videoId);
         // Update UI to "Done!" state.
         updateUI(tabId, "Done!", "green");
-        // Kill any active job if one exists.
-        if (activeJobs[tabId] && activeJobs[tabId].pollInterval) {
-          clearInterval(activeJobs[tabId].pollInterval);
+        // Clear any record of a previous job for this tab.
+        if (activeJobs[tabId]) {
           delete activeJobs[tabId];
         }
         sendResponse({ success: true, videoId, cached: true });
@@ -58,39 +57,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             // Otherwise, the server has started a new transcription job.
             const jobId = data.jobId;
-            activeJobs[tabId] = { jobId, pollInterval: null };
+            activeJobs[tabId] = { jobId };
             console.log("Job started with jobId:", jobId);
-            // Poll every second for job status.
-            const pollInterval = setInterval(() => {
-              fetch(`http://localhost:5010/api/status?jobId=${jobId}`)
-                .then(res => res.json())
-                .then(statusData => {
-                  if (statusData.status === "downloading") {
-                    updateUI(tabId, "Downloading...", "#1a73e8");
-                  } else if (statusData.status === "transcribing") {
-                    updateUI(tabId, "Transcribing...", "#1a73e8");
-                  } else if (statusData.status === "done") {
-                    clearInterval(pollInterval);
-                    delete activeJobs[tabId];
-                    updateUI(tabId, "Done!", "green");
-                    const transcript = statusData.transcript;
-                    const compressed = LZString.compressToUTF16(transcript);
-                    chrome.storage.local.set({ [`transcript_${videoId}`]: compressed }, () => {
-                      console.log(`Compressed and saved transcript under transcript_${videoId}`);
-                      sendResponse({ success: true, videoId });
-                    });
-                  } else if (statusData.status === "error") {
-                    clearInterval(pollInterval);
-                    delete activeJobs[tabId];
-                    updateUI(tabId, "Error", "red");
-                    sendResponse({ success: false, error: statusData.error });
-                  }
-                })
-                .catch(err => {
-                  console.error("Error during polling:", err);
-                });
-            }, 1000);
-            activeJobs[tabId].pollInterval = pollInterval;
+            // Content script will poll for status.
+            sendResponse({ success: true, videoId, jobId });
+            return;
           })
           .catch(err => {
             console.error("Transcription error:", err);
@@ -103,10 +74,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "killJob") {
     // Kill active job when user clicks the close ("✖") button.
     const tabId = sender.tab.id;
-    if (activeJobs[tabId] && activeJobs[tabId].jobId) {
-      const jobId = activeJobs[tabId].jobId;
-      clearInterval(activeJobs[tabId].pollInterval);
-      delete activeJobs[tabId];
+    const jobId = message.jobId || (activeJobs[tabId] && activeJobs[tabId].jobId);
+    if (jobId) {
+      if (activeJobs[tabId]) {
+        delete activeJobs[tabId];
+      }
       fetch(`http://localhost:5010/api/kill?jobId=${jobId}`, { method: "POST" })
         .then(res => res.json())
         .then(data => {
