@@ -6,6 +6,11 @@ let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
 
+function showApiError(action, data) {
+  console.error(`${action} API error`, data);
+  alert(`Failed to ${action}: ` + (data.error?.message || JSON.stringify(data)));
+}
+
 async function loadAssistants(apiKey) {
   const container = document.getElementById("agentList");
   if (!container || !apiKey) return;
@@ -18,6 +23,10 @@ async function loadAssistants(apiKey) {
       },
     });
     const data = await res.json();
+    if (!res.ok) {
+      showApiError("load assistants", data);
+      return;
+    }
     (data.data || []).forEach((a) => {
       const details = document.createElement("details");
       details.className = "card";
@@ -91,6 +100,10 @@ async function createCustomAssistant(apiKey) {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+    if (!res.ok) {
+      showApiError("create assistant", data);
+      return;
+    }
     if (data.id) {
       await loadAssistants(apiKey);
       const status = document.getElementById("agentStatus");
