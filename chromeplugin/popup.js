@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
     storage.get(["apiKey"], (r) => {
       if (r.apiKey) {
         storedApiKey = r.apiKey;
+        if (transcriptBox.value.trim()) {
+          generateSuggestions();
+        }
       }
     });
   });
@@ -156,11 +159,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
-        generateSuggestions();
       } else {
         transcriptBox.value = "Error decompressing transcript.";
+        return;
       }
-      transcriptBox.value = transcript;
       generateSuggestions();
     });
   }
