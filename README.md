@@ -4,6 +4,12 @@ Chrome extension and Python backend for transcribing YouTube videos with the **f
 
 Transcripts are cached per video on disk and in the browser. Any questions you ask are saved in Chrome sync storage so they remain tied to your Google account and are not shared with other users. A copy of each question/answer pair is also written on the server next to the transcript for that video.
 
+## Requirements
+
+- Python 3.10
+- ffmpeg (auto-downloaded by the setup script)
+- Python packages from `requirements.txt` (`pip install -r requirements.txt`)
+
 ## Architecture
 
 The project consists of a small Flask server and a Chrome extension that talk over HTTP.

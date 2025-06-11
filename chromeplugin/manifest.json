@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTranscribe",
-  "description": "Transcribe and analyze YouTube videos using Whisper and GPT-4o.",
+  "description": "Transcribe and analyze YouTube videos using faster-whisper and GPT-4o.",
   "version": "1.0",
 
   "web_accessible_resources": [
