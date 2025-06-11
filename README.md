@@ -19,12 +19,15 @@ Transcripts are cached per video on disk and in the browser. Any questions you a
    ```bash
    pip install -r requirements-dev.txt
    ```
-3. Start the server:
+3. Copy `.env.example` to `.env` and adjust the settings if needed.
+   At minimum you can override `FFMPEG_DIR` to point at your ffmpeg binaries
+   or change the `PORT` used by the server.
+4. Start the server:
    ```bash
    python yt_ai_server.py
    ```
-   The API is now available on `http://localhost:5010`.
-4. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
+   The API is now available on `http://localhost:5010` by default.
+5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
 
 See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for details on the available endpoints and how to run the server. For information about the automated test suite see [docs/TESTING.md](docs/TESTING.md).
 

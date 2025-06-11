@@ -1,3 +1,5 @@
+"""Flask server for downloading and transcribing YouTube videos."""
+
 from flask import Flask, request, jsonify
 import sys
 import subprocess
@@ -11,23 +13,40 @@ import uuid
 import threading
 import shutil
 import json
+import logging
 from urllib.parse import urlparse, parse_qs
+from dotenv import load_dotenv
 
-# Patch PATH so that faster-whisper can find ffmpeg. Use paths relative to this file
+from job import Job
+from job_manager import JobManager
+
+load_dotenv()
+
+# Base directory for resolving relative paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FFMPEG_DIR = os.path.join(BASE_DIR, "ffmpeg", "bin")
-os.environ["PATH"] += os.pathsep + FFMPEG_DIR
+
+# Directory containing ffmpeg binaries
+FFMPEG_DIR = os.getenv("FFMPEG_DIR", os.path.join(BASE_DIR, "ffmpeg", "bin"))
+
+# Server listening port
+PORT = int(os.getenv("PORT", "5010"))
+
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(message)s")
+LOGGER = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-print("Loading faster-whisper model once at startup...")
+LOGGER.info("Loading faster-whisper model once at startup...")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 COMPUTE_TYPE = "float16" if DEVICE == "cuda" else "int8"
 WHISPER_MODEL = WhisperModel("base", device=DEVICE, compute_type=COMPUTE_TYPE)
-print("faster-whisper model loaded on", DEVICE, "with", COMPUTE_TYPE)
+LOGGER.info("faster-whisper model loaded on %s with %s", DEVICE, COMPUTE_TYPE)
 
-# Global dictionary to hold active job statuses and results (transient).
-jobs = {}
+# Thread-safe job manager. The raw dictionary is exported for backward
+# compatibility with unit tests.
+job_manager = JobManager()
+jobs = job_manager.jobs
 
 # Persistent caching: each video gets its own folder under
 # chromeplugin/transcripts where the transcript and any saved QA pairs are
@@ -49,10 +68,13 @@ def get_qa_filename(video_id):
     """Return the QA file for the video."""
     return os.path.join(get_video_dir(video_id), f"{video_id}_qa.txt")
 
-def process_job(job_id, url, video_id):
+def process_job(job_id: str, url: str, video_id: str) -> None:
+    """Background worker that downloads and transcribes the video."""
     temp_dir = tempfile.mkdtemp()
-    print("Using temp dir:", temp_dir)
-    jobs[job_id]["status"] = "downloading"
+    LOGGER.info("Using temp dir: %s", temp_dir)
+    job_manager.update(job_id, status="downloading")
+    env = os.environ.copy()
+    env["PATH"] = env.get("PATH", "") + os.pathsep + FFMPEG_DIR
     try:
         subprocess.run([
             sys.executable,
@@ -66,58 +88,65 @@ def process_job(job_id, url, video_id):
             "-o",
             f"{temp_dir}/%(title)s.%(ext)s",
             url,
-        ], check=True)
+        ], check=True, env=env)
+    except subprocess.CalledProcessError as e:
+        LOGGER.exception("Download failed")
+        job_manager.update(job_id, status="error", error=f"Failed to download: {e}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return
     except Exception as e:
-        print("Download failed:", e)
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = f"Failed to download: {e}"
-        shutil.rmtree(temp_dir)
+        LOGGER.exception("Unexpected error during download")
+        job_manager.update(job_id, status="error", error=str(e))
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     mp3_files = glob.glob(os.path.join(temp_dir, "*.mp3"))
     if not mp3_files:
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = "No MP3 file was downloaded."
-        shutil.rmtree(temp_dir)
+        job_manager.update(job_id, status="error", error="No MP3 file was downloaded.")
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     audio_file = mp3_files[0]
-    print("Found audio file:", audio_file)
-    if jobs[job_id].get("killed"):
-        shutil.rmtree(temp_dir)
+    LOGGER.info("Found audio file: %s", audio_file)
+    job = job_manager.get(job_id)
+    if job and job.killed:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
-    jobs[job_id]["status"] = "transcribing"
-    print("Starting transcription...")
+    job_manager.update(job_id, status="transcribing")
+    LOGGER.info("Starting transcription...")
     try:
         segments, _ = WHISPER_MODEL.transcribe(audio_file)
     except Exception as e:
-        print("Transcription failed:", e)
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = f"Failed to transcribe: {e}"
-        shutil.rmtree(temp_dir)
+        LOGGER.exception("Transcription failed")
+        job_manager.update(job_id, status="error", error=f"Failed to transcribe: {e}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
-    if jobs[job_id].get("killed"):
-        shutil.rmtree(temp_dir)
+    job = job_manager.get(job_id)
+    if job and job.killed:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     transcript = "".join(segment.text for segment in segments)
-    print("Transcription complete.")
-    jobs[job_id]["status"] = "done"
-    jobs[job_id]["transcript"] = transcript
+    LOGGER.info("Transcription complete.")
+    job_manager.update(job_id, status="done", transcript=transcript)
 
     cache_filename = get_cache_filename(video_id)
     with open(cache_filename, "w", encoding="utf-8") as f:
         f.write(transcript)
-    print("Cached transcript to", cache_filename)
+    LOGGER.info("Cached transcript to %s", cache_filename)
 
-    os.remove(audio_file)
-    shutil.rmtree(temp_dir)
+    try:
+        os.remove(audio_file)
+    except OSError as e:
+        LOGGER.warning("Failed to remove %s: %s", audio_file, e)
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
 @app.route("/api/transcribe", methods=["POST"])
 def start_transcription():
-    data = request.get_json()
+    """Begin a new transcription job or return an existing one."""
+    data = request.get_json() or {}
     url = data.get("url")
     if not url:
         return jsonify({"error": "URL is required"}), 400
@@ -131,47 +160,45 @@ def start_transcription():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             transcript = f.read()
-        print("Found cached transcript for video ID:", video_id,
-              "len=", len(transcript))
+        LOGGER.info("Found cached transcript for video ID: %s len=%s", video_id, len(transcript))
         return jsonify({"transcript": transcript, "cached": True})
     # If a job is already running for this video, reuse it and add a listener.
-    for jid, job in jobs.items():
-        if job.get("video_id") == video_id and job.get("status") not in ("done", "error", "cancelled"):
-            job["listeners"] = job.get("listeners", 1) + 1
-            print("Reusing job", jid, "listeners", job["listeners"])
+    for jid, job in list(job_manager.jobs.items()):
+        if job.video_id == video_id and job.status not in ("done", "error", "cancelled"):
+            listeners = job_manager.increment_listeners(jid)
+            LOGGER.info("Reusing job %s listeners %d", jid, listeners)
             return jsonify({"jobId": jid})
 
     # Otherwise, start a new transcription job.
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "queued", "video_id": video_id, "listeners": 1}
-    thread = threading.Thread(target=process_job, args=(job_id, url, video_id))
+    job = job_manager.create_job(video_id)
+    thread = threading.Thread(target=process_job, args=(job.job_id, url, video_id))
     thread.start()
-    return jsonify({"jobId": job_id})
+    return jsonify({"jobId": job.job_id})
 
 @app.route("/api/status", methods=["GET"])
 def job_status():
+    """Return the current status for a job."""
     job_id = request.args.get("jobId")
-    if not job_id or job_id not in jobs:
+    job = job_manager.get(job_id) if job_id else None
+    if not job:
         return jsonify({"error": "Job not found"}), 404
-    job = jobs[job_id].copy()
-    print("Status check", job_id, job.get("status"))
-    if job.get("status") == "done" and job.get("transcript"):
-        print("Returning transcript length", len(job["transcript"]))
-    return jsonify(job)
+    LOGGER.info("Status check %s %s", job_id, job.status)
+    if job.status == "done" and job.transcript:
+        LOGGER.info("Returning transcript length %d", len(job.transcript))
+    return jsonify(job.to_dict())
 
 @app.route("/api/kill", methods=["POST"])
 def kill_job():
+    """Reduce the listener count or cancel a job when none remain."""
     job_id = request.args.get("jobId")
-    if not job_id or job_id not in jobs:
+    job = job_manager.get(job_id) if job_id else None
+    if not job:
         return jsonify({"error": "Job not found"}), 404
-    job = jobs[job_id]
-    listeners = job.get("listeners", 1)
-    if listeners > 1:
-        job["listeners"] = listeners - 1
-        print("Decremented listener count for", job_id, "to", job["listeners"])
-        return jsonify({"success": True, "status": job.get("status"), "listeners": job["listeners"]})
-    job["killed"] = True
-    job["status"] = "cancelled"
+    if job.listeners > 1:
+        job_manager.update(job_id, listeners=job.listeners - 1)
+        LOGGER.info("Decremented listener count for %s to %d", job_id, job.listeners)
+        return jsonify({"success": True, "status": job.status, "listeners": job.listeners})
+    job_manager.update(job_id, killed=True, status="cancelled", listeners=0)
     return jsonify({"success": True, "status": "cancelled", "listeners": 0})
 
 @app.route("/api/load", methods=["GET"])
@@ -183,8 +210,7 @@ def load_transcript():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             transcript = f.read()
-        print("Loaded cached transcript for video id:", video_id,
-              "len=", len(transcript))
+        LOGGER.info("Loaded cached transcript for video id: %s len=%s", video_id, len(transcript))
         return jsonify({"transcript": transcript, "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
@@ -204,5 +230,5 @@ def save_qa():
     return jsonify({"success": True})
 
 if __name__ == "__main__":
-    print("🚀 Starting YouTranscribe server on http://localhost:5010")
-    app.run(port=5010)
+    LOGGER.info("🚀 Starting YouTranscribe server on http://localhost:%s", PORT)
+    app.run(port=PORT)

@@ -43,8 +43,8 @@ def app(monkeypatch, tmp_path):
     monkeypatch.setattr(yt_ai_server, "CACHE_DIR", tmp_path)
 
     def dummy_process(job_id, url, video_id):
-        yt_ai_server.jobs[job_id]["status"] = "done"
-        yt_ai_server.jobs[job_id]["transcript"] = "dummy transcript"
+        yt_ai_server.jobs[job_id].status = "done"
+        yt_ai_server.jobs[job_id].transcript = "dummy transcript"
         cache_file = yt_ai_server.get_cache_filename(video_id)
         with open(cache_file, "w", encoding="utf-8") as f:
             f.write("dummy transcript")
@@ -124,7 +124,7 @@ def test_job_listener_count(monkeypatch, tmp_path):
     monkeypatch.setattr(yt_ai_server, "CACHE_DIR", tmp_path)
 
     def dummy_process(job_id, url, video_id):
-        yt_ai_server.jobs[job_id]["status"] = "transcribing"
+        yt_ai_server.jobs[job_id].status = "transcribing"
 
     monkeypatch.setattr(yt_ai_server, "process_job", dummy_process)
 
@@ -133,15 +133,15 @@ def test_job_listener_count(monkeypatch, tmp_path):
 
     first = client.post("/api/transcribe", json={"url": url}).get_json()
     jid = first["jobId"]
-    assert yt_ai_server.jobs[jid]["listeners"] == 1
+    assert yt_ai_server.jobs[jid].listeners == 1
 
     second = client.post("/api/transcribe", json={"url": url}).get_json()
     assert second["jobId"] == jid
-    assert yt_ai_server.jobs[jid]["listeners"] == 2
+    assert yt_ai_server.jobs[jid].listeners == 2
 
     kill1 = client.post("/api/kill", query_string={"jobId": jid}).get_json()
     assert kill1["listeners"] == 1
-    assert yt_ai_server.jobs[jid]["status"] != "cancelled"
+    assert yt_ai_server.jobs[jid].status != "cancelled"
 
     kill2 = client.post("/api/kill", query_string={"jobId": jid}).get_json()
     assert kill2["status"] == "cancelled"
@@ -158,5 +158,5 @@ def test_kill_sets_killed_flag(app):
     assert kill["success"] is True
     assert kill["status"] == "cancelled"
     assert kill["listeners"] == 0
-    assert server.jobs[jid]["killed"] is True
+    assert server.jobs[jid].killed is True
 
