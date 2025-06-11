@@ -6,6 +6,15 @@ The UI features smooth microanimations for button presses and question cards. Sw
 
 Transcripts are cached per video on disk and in the browser. Any questions you ask are saved in Chrome sync storage so they remain tied to your Google account and are not shared with other users. A copy of each question/answer pair is also written on the server next to the transcript for that video.
 
+As you continue asking questions, the extension now uses OpenAI's Assistants API
+to keep a dedicated conversation thread per video. If no Assistant ID is saved
+the plugin will automatically create a standard **YouTranscribe** assistant when
+it loads. You can also create this assistant manually from the settings page via
+the **Create Standard Assistant** button. Once an ID is available, each
+follow-up question will be sent in the same thread so GPT has full context. The
+history is still stored locally and written to disk via the server for later
+retrieval.
+
 ## Setup
 
 1. Install Python 3.10 or newer and create a virtual environment (optional):
@@ -30,7 +39,7 @@ Transcripts are cached per video on disk and in the browser. Any questions you a
    ```
    The API is now available on `http://localhost:5010` by default, with CORS
    enabled so the Chrome extension can connect.
-5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
+5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI. The extension now directly calls OpenAI's API, so Chrome will ask for permission to access `https://api.openai.com/`.
 6. Generate a ChatGPT API key by visiting [OpenAI's API key page](https://platform.openai.com/api-keys).
    Open the extension on any YouTube video and click the **cogwheel** icon to go
    to the settings page, then paste your key into the **OpenAI API Key** field.
