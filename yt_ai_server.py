@@ -11,6 +11,7 @@ import uuid
 import threading
 import shutil
 import json
+from lzstring import LZString
 from urllib.parse import urlparse, parse_qs
 
 # Patch PATH so that Whisper can find ffmpeg. Use paths relative to this file
@@ -24,6 +25,9 @@ print("Loading Whisper model once at startup...")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 WHISPER_MODEL = whisper.load_model("base", device=DEVICE)
 print("Whisper model loaded on", DEVICE)
+
+# Initialize LZString for transcript compression
+LZ = LZString()
 
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
@@ -64,8 +68,9 @@ def process_job(job_id, url, video_id):
         jobs[job_id]['status'] = "done"
         jobs[job_id]['transcript'] = transcript
 
-        # Save the transcript persistently as a JSON file.
-        cache_data = {"video_id": video_id, "transcript": transcript}
+        # Save the transcript persistently as a JSON file (compressed)
+        compressed = LZ.compressToUTF16(transcript)
+        cache_data = {"video_id": video_id, "transcript": compressed}
         cache_filename = get_cache_filename(video_id)
         with open(cache_filename, "w", encoding="utf-8") as f:
             json.dump(cache_data, f)
@@ -100,9 +105,10 @@ def start_transcription():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
+        transcript = LZ.decompressFromUTF16(cache_data["transcript"])
         print("Found cached transcript for video ID:", video_id,
-              "len=", len(cache_data["transcript"]))
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+              "len=", len(transcript))
+        return jsonify({"transcript": transcript, "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "queued"}
@@ -139,9 +145,10 @@ def load_transcript():
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
             cache_data = json.load(f)
+        transcript = LZ.decompressFromUTF16(cache_data["transcript"])
         print("Loaded cached transcript for video id:", video_id,
-              "len=", len(cache_data["transcript"]))
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+              "len=", len(transcript))
+        return jsonify({"transcript": transcript, "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
 

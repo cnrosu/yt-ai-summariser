@@ -112,8 +112,6 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         transcriptBox.value = "Error decompressing transcript.";
       }
-      transcriptBox.value = transcript;
-      generateSuggestions();
     });
   }
 
