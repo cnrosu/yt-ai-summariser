@@ -1,6 +1,9 @@
 let currentModel = "gpt-4o";
 let storedApiKey = "";
 let currentVideoId = null;
+let qaHistory = [];
+let assistantId = "";
+let threadId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const transcriptBox = document.getElementById("transcriptBox");
@@ -8,15 +11,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatInput = document.getElementById("chatInput");
   const suggested = document.getElementById("suggested");
 
-  chrome.storage.sync.get(["model", "keyLocation"], (res) => {
+  chrome.storage.sync.get(["model", "keyLocation", "assistantId"], (res) => {
     if (res.model) {
       currentModel = res.model;
     }
+    if (res.assistantId) {
+      assistantId = res.assistantId;
+    }
     const location = res.keyLocation || "sync";
     const storage = location === "local" ? chrome.storage.local : chrome.storage.sync;
-    storage.get(["apiKey"], (r) => {
+    storage.get(["apiKey"], async (r) => {
       if (r.apiKey) {
         storedApiKey = r.apiKey;
+        if (!assistantId) {
+          assistantId = await createStandardAssistant(r.apiKey);
+          if (assistantId) {
+            chrome.storage.sync.set({ assistantId });
+          }
+        }
         if (transcriptBox.value.trim()) {
           generateSuggestions();
         }
@@ -105,23 +117,19 @@ document.addEventListener("DOMContentLoaded", () => {
     qaContainer.prepend(details);
     attachInteractions(details, answerDiv);
 
-    const messages = [
-      {
-        role: "system",
-        content:
-          "You are a helpful assistant. Provide concise answers in raw HTML only.",
-      },
-      { role: "user", content: `Transcript:\n${transcript}` },
-      { role: "user", content: `Question:\n${question}` },
-    ];
+    const first = qaHistory.length === 0;
+    const content = first
+      ? `Transcript:\n${transcript}\n\nQuestion:\n${question}`
+      : question;
 
-    const reply = await sendToGPT(messages, apiKey);
+    const reply = await sendViaAssistant(content, apiKey);
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
     summary.removeChild(loader);
     details.classList.remove("loading");
     details.open = true;
     saveQA(question, clean);
+    qaHistory.push({ question, answer: clean });
   }
 
   document.getElementById("chatSend").addEventListener("click", () => {
@@ -188,6 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const key = `qa_${videoId}`;
     chrome.storage.local.get(key, (res) => {
       const arr = res[key] || [];
+      qaHistory = arr.slice();
       arr.forEach((item) => {
         const details = document.createElement("details");
         details.className = "card fade-in";
@@ -210,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const arr = res[key] || [];
       arr.push({ question, answer });
       chrome.storage.local.set({ [key]: arr });
+      qaHistory = arr.slice();
     });
     fetch("http://localhost:5010/api/save_qa", {
       method: "POST",
@@ -268,11 +278,110 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function loadThread(videoId) {
+    const key = `thread_${videoId}`;
+    chrome.storage.local.get(key, (res) => {
+      threadId = res[key] || null;
+    });
+  }
+
+  async function ensureThread() {
+    if (threadId) return;
+    try {
+      const res = await fetch("https://api.openai.com/v1/threads", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${storedApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      threadId = data.id;
+      if (currentVideoId && threadId) {
+        chrome.storage.local.set({ [`thread_${currentVideoId}`]: threadId });
+      }
+    } catch (err) {
+      console.error("Failed to create thread", err);
+    }
+  }
+
+  async function sendViaAssistant(content, apiKey) {
+    if (!assistantId) {
+      return "Assistant ID not set.";
+    }
+    await ensureThread();
+    if (!threadId) {
+      return "Failed to create thread.";
+    }
+    const headers = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ role: "user", content }),
+    });
+    const runRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ assistant_id: assistantId }),
+    });
+    const run = await runRes.json();
+    if (run.error) {
+      return `Error: ${run.error.message}`;
+    }
+    const runId = run.id;
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const statusRes = await fetch(
+        `https://api.openai.com/v1/threads/${threadId}/runs/${runId}`,
+        { headers }
+      );
+      const data = await statusRes.json();
+      if (data.status === "completed") break;
+      if (["failed", "cancelled", "expired"].includes(data.status)) {
+        return `Error: run ${data.status}`;
+      }
+    }
+    const msgRes = await fetch(
+      `https://api.openai.com/v1/threads/${threadId}/messages?limit=1`,
+      { headers }
+    );
+    const msgData = await msgRes.json();
+    return msgData.data?.[0]?.content?.[0]?.text?.value || "";
+  }
+
+  async function createStandardAssistant(apiKey) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/assistants", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: currentModel,
+          name: "YouTranscribe",
+          instructions:
+            "You are a YouTube video transcription AI. Answer questions about the provided transcript in concise HTML.",
+        }),
+      });
+      const data = await res.json();
+      return data.id || null;
+    } catch (err) {
+      console.error("Failed to create assistant", err);
+      return null;
+    }
+  }
+
   getVideoId((videoId) => {
     if (videoId) {
       currentVideoId = videoId;
       loadTranscript(videoId);
       loadQA(videoId);
+      loadThread(videoId);
     } else {
       transcriptBox.value = "Could not detect YouTube video ID.";
     }
