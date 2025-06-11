@@ -50,50 +50,70 @@ def get_qa_filename(video_id):
     return os.path.join(get_video_dir(video_id), f"{video_id}_qa.txt")
 
 def process_job(job_id, url, video_id):
+    temp_dir = tempfile.mkdtemp()
+    print("Using temp dir:", temp_dir)
+    jobs[job_id]["status"] = "downloading"
     try:
-        temp_dir = tempfile.mkdtemp()
-        print("Using temp dir:", temp_dir)
-        jobs[job_id]['status'] = "downloading"
-        # Download audio using yt-dlp.
         subprocess.run([
-            sys.executable, "-m", "yt_dlp",
-            "-x", "--audio-format", "mp3",
-            "--ffmpeg-location", FFMPEG_DIR,
-            "-o", f"{temp_dir}/%(title)s.%(ext)s",
-            url
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            "-x",
+            "--audio-format",
+            "mp3",
+            "--ffmpeg-location",
+            FFMPEG_DIR,
+            "-o",
+            f"{temp_dir}/%(title)s.%(ext)s",
+            url,
         ], check=True)
-
-        mp3_files = glob.glob(os.path.join(temp_dir, "*.mp3"))
-        if not mp3_files:
-            raise Exception("No MP3 file was downloaded.")
-        audio_file = mp3_files[0]
-        print("Found audio file:", audio_file)
-        jobs[job_id]['status'] = "transcribing"
-        print("Starting transcription...")
-        segments, _ = WHISPER_MODEL.transcribe(audio_file)
-        transcript = "".join(segment.text for segment in segments)
-        print("Transcription complete.")
-        jobs[job_id]['status'] = "done"
-        jobs[job_id]['transcript'] = transcript
-
-        # Save the transcript persistently as plain text in the video folder.
-        cache_filename = get_cache_filename(video_id)
-        with open(cache_filename, "w", encoding="utf-8") as f:
-            f.write(transcript)
-        print("Cached transcript to", cache_filename)
-
-        os.remove(audio_file)
-        shutil.rmtree(temp_dir)
-
     except Exception as e:
-        print("ERROR during transcription:")
-        traceback.print_exc()
-        jobs[job_id]['status'] = "error"
-        jobs[job_id]['error'] = str(e)
-        try:
-            shutil.rmtree(temp_dir)
-        except Exception:
-            pass
+        print("Download failed:", e)
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = f"Failed to download: {e}"
+        shutil.rmtree(temp_dir)
+        return
+
+    mp3_files = glob.glob(os.path.join(temp_dir, "*.mp3"))
+    if not mp3_files:
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = "No MP3 file was downloaded."
+        shutil.rmtree(temp_dir)
+        return
+
+    audio_file = mp3_files[0]
+    print("Found audio file:", audio_file)
+    if jobs[job_id].get("killed"):
+        shutil.rmtree(temp_dir)
+        return
+
+    jobs[job_id]["status"] = "transcribing"
+    print("Starting transcription...")
+    try:
+        segments, _ = WHISPER_MODEL.transcribe(audio_file)
+    except Exception as e:
+        print("Transcription failed:", e)
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = f"Failed to transcribe: {e}"
+        shutil.rmtree(temp_dir)
+        return
+
+    if jobs[job_id].get("killed"):
+        shutil.rmtree(temp_dir)
+        return
+
+    transcript = "".join(segment.text for segment in segments)
+    print("Transcription complete.")
+    jobs[job_id]["status"] = "done"
+    jobs[job_id]["transcript"] = transcript
+
+    cache_filename = get_cache_filename(video_id)
+    with open(cache_filename, "w", encoding="utf-8") as f:
+        f.write(transcript)
+    print("Cached transcript to", cache_filename)
+
+    os.remove(audio_file)
+    shutil.rmtree(temp_dir)
 
 @app.route("/api/transcribe", methods=["POST"])
 def start_transcription():
@@ -114,9 +134,16 @@ def start_transcription():
         print("Found cached transcript for video ID:", video_id,
               "len=", len(transcript))
         return jsonify({"transcript": transcript, "cached": True})
+    # If a job is already running for this video, reuse it and add a listener.
+    for jid, job in jobs.items():
+        if job.get("video_id") == video_id and job.get("status") not in ("done", "error", "cancelled"):
+            job["listeners"] = job.get("listeners", 1) + 1
+            print("Reusing job", jid, "listeners", job["listeners"])
+            return jsonify({"jobId": jid})
+
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "queued"}
+    jobs[job_id] = {"status": "queued", "video_id": video_id, "listeners": 1}
     thread = threading.Thread(target=process_job, args=(job_id, url, video_id))
     thread.start()
     return jsonify({"jobId": job_id})
@@ -138,8 +165,14 @@ def kill_job():
     if not job_id or job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
     job = jobs[job_id]
+    listeners = job.get("listeners", 1)
+    if listeners > 1:
+        job["listeners"] = listeners - 1
+        print("Decremented listener count for", job_id, "to", job["listeners"])
+        return jsonify({"success": True, "status": job.get("status"), "listeners": job["listeners"]})
     job["killed"] = True
-    return jsonify({"success": True, "status": "cancelled"})
+    job["status"] = "cancelled"
+    return jsonify({"success": True, "status": "cancelled", "listeners": 0})
 
 @app.route("/api/load", methods=["GET"])
 def load_transcript():

@@ -46,8 +46,9 @@ function addTranscribeButton() {
     btn.disabled = true;
     chrome.runtime.sendMessage({ action: "transcribe", url: window.location.href }, (response) => {
       if (!response || !response.success) {
-        btn.innerText = "Error";
+        btn.innerText = response && response.error ? response.error : "Error";
         container.style.backgroundColor = "red";
+        btn.disabled = false;
         return;
       }
       if (response.cached) {
@@ -129,13 +130,22 @@ function pollStatus(jobId, videoId) {
         statusInterval = null;
         currentJobId = null;
         if (btn && container) {
-          btn.innerText = "Error";
+          btn.innerText = data.error ? data.error : "Failed";
           container.style.backgroundColor = "red";
           btn.disabled = false;
         }
       }
     })
-    .catch(err => console.error("Polling error", err));
+    .catch(err => {
+      console.error("Polling error", err);
+      const btn = document.getElementById("yt-ai-btn");
+      const container = document.getElementById("yt-ai-container");
+      if (btn && container) {
+        btn.innerText = "Server offline";
+        container.style.backgroundColor = "red";
+        btn.disabled = false;
+      }
+    });
 }
 
 function loadCachedTranscript() {
