@@ -3,6 +3,7 @@ let storedApiKey = "";
 let currentVideoId = null;
 let qaHistory = [];
 let assistantId = "";
+const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -55,7 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
             chrome.storage.sync.set({ assistantId });
             console.log("Stored new Assistant ID", assistantId);
           }
-        }
         if (transcriptBox.value.trim()) {
           generateSuggestions();
         }
@@ -450,8 +450,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return msgData.data?.[0]?.content?.[0]?.text?.value || "";
   }
 
-  async function createStandardAssistant(apiKey) {
-    console.log("Creating standard assistant");
+  async function createAssistant(apiKey, name) {
+    console.log("Creating assistant", name);
     try {
       const res = await fetch("https://api.openai.com/v1/assistants", {
         method: "POST",
@@ -462,7 +462,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           model: currentModel,
-          name: "YouTranscribe",
+          name,
           instructions:
             "You are a YouTube video transcription AI. Answer questions about the provided transcript in concise HTML.",
         }),
@@ -473,6 +473,31 @@ document.addEventListener("DOMContentLoaded", () => {
       return data.id || null;
     } catch (err) {
       console.error("Failed to create assistant", err);
+      return null;
+    }
+  }
+
+  async function ensureDefaultAssistant(apiKey) {
+    console.log("Ensuring default assistant exists");
+    try {
+      const list = await fetch(
+        "https://api.openai.com/v1/assistants?limit=100",
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "OpenAI-Beta": "assistants=v2",
+          },
+        }
+      );
+      const data = await list.json();
+      const found = data.data?.find((a) => a.name === DEFAULT_ASSISTANT_NAME);
+      if (found) {
+        console.log("Found existing default assistant", found.id);
+        return found.id;
+      }
+      return await createAssistant(apiKey, DEFAULT_ASSISTANT_NAME);
+    } catch (err) {
+      console.error("Failed to list assistants", err);
       return null;
     }
   }
