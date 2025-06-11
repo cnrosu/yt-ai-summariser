@@ -26,7 +26,8 @@ Transcripts are cached per video on disk and in the browser. Any questions you a
    ```bash
    python yt_ai_server.py
    ```
-   The API is now available on `http://localhost:5010` by default.
+   The API is now available on `http://localhost:5010` by default, with CORS
+   enabled so the Chrome extension can connect.
 5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
 6. Generate a ChatGPT API key by visiting [OpenAI's API key page](https://platform.openai.com/api-keys).
    Open the extension on any YouTube video and click the **cogwheel** icon to go

@@ -2,5 +2,6 @@ faster-whisper
 yt-dlp
 ffmpeg-python
 flask
+flask-cors
 requests
 python-dotenv
