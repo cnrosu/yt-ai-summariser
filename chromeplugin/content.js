@@ -108,14 +108,8 @@ function loadCachedTranscript() {
     .catch(err => console.error("Error loading cached transcript:", err));
 }
 
-// On page load and YouTube navigation, inject fresh UI then load any cached transcript.
+// Inject the UI on YouTube navigation events, then load any cached transcript.
 window.addEventListener("yt-navigate-finish", () => {
-  setTimeout(() => {
-    addTranscribeButton();
-    loadCachedTranscript();
-  }, 1000);
-});
-window.addEventListener("load", () => {
   setTimeout(() => {
     addTranscribeButton();
     loadCachedTranscript();
