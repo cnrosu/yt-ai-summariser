@@ -39,7 +39,7 @@ retrieval.
    ```
    The API is now available on `http://localhost:5010` by default, with CORS
    enabled so the Chrome extension can connect.
-5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
+5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI. The extension now directly calls OpenAI's API, so Chrome will ask for permission to access `https://api.openai.com/`.
 6. Generate a ChatGPT API key by visiting [OpenAI's API key page](https://platform.openai.com/api-keys).
    Open the extension on any YouTube video and click the **cogwheel** icon to go
    to the settings page, then paste your key into the **OpenAI API Key** field.
