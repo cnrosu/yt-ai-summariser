@@ -56,7 +56,7 @@ function addTranscribeButton() {
         btn.disabled = false;
       } else if (response.jobId) {
         currentJobId = response.jobId;
-        statusInterval = setInterval(() => pollStatus(response.jobId, response.videoId), 1000);
+        statusInterval = setInterval(() => pollStatus(response.jobId, response.videoId), 5000);
       }
     });
   };
