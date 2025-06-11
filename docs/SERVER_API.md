@@ -99,7 +99,7 @@ All saved Q&A pairs are appended as JSON lines to `<video_id>_qa.txt` inside the
 
 ## Running the Server
 
-Install the dependencies listed in `setup_yt_ai.ps1` or run the setup scripts for your platform. Then execute:
+Install Python 3.10 and install the packages from `requirements.txt` (or run the `setup_yt_ai.ps1` script). Then execute:
 ```bash
 python yt_ai_server.py
 ```
