@@ -19,7 +19,8 @@
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
-    "http://localhost:5010/*"
+    "http://localhost:5010/*",
+    "https://api.openai.com/*"
   ],
 
   "action": {
