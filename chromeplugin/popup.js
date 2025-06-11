@@ -1,5 +1,6 @@
 let currentModel = "gpt-4o";
 let storedApiKey = "";
+let currentVideoId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const transcriptBox = document.getElementById("transcriptBox");
@@ -53,7 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
     const reply = await sendToGPT(messages, apiKey);
-    answerDiv.innerHTML = cleanReply(reply);
+    const clean = cleanReply(reply);
+    answerDiv.innerHTML = clean;
+    saveQA(question, clean);
   }
 
   document.getElementById("chatSend").addEventListener("click", () => {
@@ -117,6 +120,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function loadQA(videoId) {
+    const key = `qa_${videoId}`;
+    chrome.storage.sync.get(key, (res) => {
+      const arr = res[key] || [];
+      arr.forEach((item) => {
+        const details = document.createElement("details");
+        details.className = "card";
+        const summary = document.createElement("summary");
+        summary.textContent = item.question;
+        const answerDiv = document.createElement("div");
+        answerDiv.innerHTML = item.answer;
+        details.appendChild(summary);
+        details.appendChild(answerDiv);
+        qaContainer.prepend(details);
+      });
+    });
+  }
+
+  function saveQA(question, answer) {
+    if (!currentVideoId) return;
+    const key = `qa_${currentVideoId}`;
+    chrome.storage.sync.get(key, (res) => {
+      const arr = res[key] || [];
+      arr.push({ question, answer });
+      chrome.storage.sync.set({ [key]: arr });
+    });
+    fetch("http://localhost:5010/api/save_qa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId: currentVideoId, question, answer }),
+    }).catch((err) => console.error("Failed to save QA", err));
+  }
+
   async function generateSuggestions() {
     if (!storedApiKey) return;
     const transcript = transcriptBox.value.trim();
@@ -169,7 +205,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   getVideoId((videoId) => {
     if (videoId) {
+      currentVideoId = videoId;
       loadTranscript(videoId);
+      loadQA(videoId);
     } else {
       transcriptBox.value = "Could not detect YouTube video ID.";
     }
