@@ -234,7 +234,14 @@ document.addEventListener("DOMContentLoaded", () => {
   async function generateSuggestions() {
     if (!storedApiKey) return;
     const transcript = transcriptBox.value.trim();
-    if (!transcript) return;
+    if (
+      !transcript ||
+      transcript.startsWith("Transcript not found") ||
+      transcript.startsWith("Error decompressing") ||
+      transcript.startsWith("Could not detect")
+    ) {
+      return;
+    }
     suggested.textContent = "Loading questions...";
     const messages = [
       {
