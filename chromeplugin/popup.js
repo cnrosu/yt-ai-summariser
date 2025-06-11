@@ -297,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: {
           Authorization: `Bearer ${storedApiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({}),
       });
@@ -323,6 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const headers = {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "OpenAI-Beta": "assistants=v2",
     };
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
@@ -370,6 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({
           model: currentModel,
