@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import sys
 import subprocess
-import whisper
+from faster_whisper import WhisperModel
 import torch
 import os
 import tempfile
@@ -22,8 +22,9 @@ app = Flask(__name__)
 
 print("Loading Whisper model once at startup...")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-WHISPER_MODEL = whisper.load_model("base", device=DEVICE)
-print("Whisper model loaded on", DEVICE)
+COMPUTE_TYPE = "float16" if DEVICE == "cuda" else "int8"
+WHISPER_MODEL = WhisperModel("base", device=DEVICE, compute_type=COMPUTE_TYPE)
+print("Whisper model loaded on", DEVICE, "with", COMPUTE_TYPE)
 
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
@@ -69,8 +70,8 @@ def process_job(job_id, url, video_id):
         print("Found audio file:", audio_file)
         jobs[job_id]['status'] = "transcribing"
         print("Starting transcription...")
-        result = WHISPER_MODEL.transcribe(audio_file)
-        transcript = result["text"]
+        segments, _ = WHISPER_MODEL.transcribe(audio_file)
+        transcript = "".join(segment.text for segment in segments)
         print("Transcription complete.")
         jobs[job_id]['status'] = "done"
         jobs[job_id]['transcript'] = transcript
