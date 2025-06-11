@@ -85,7 +85,6 @@ async function createCustomAssistant(apiKey) {
     instructions: document.getElementById("newInstructions").value.trim(),
     temperature: parseFloat(document.getElementById("newTemp").value),
     top_p: parseFloat(document.getElementById("newTopP").value),
-    reasoning_effort: document.getElementById("newReasoning").value,
     response_format: format === "auto" ? "auto" : { type: format },
     tools: Array.from(document.querySelectorAll("input[name='tool']:checked"))
       .map((c) => ({ type: c.value })),
