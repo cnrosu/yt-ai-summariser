@@ -110,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     answerDiv.innerHTML = clean;
     summary.removeChild(loader);
     details.classList.remove("loading");
+    details.open = true;
     saveQA(question, clean);
   }
 
