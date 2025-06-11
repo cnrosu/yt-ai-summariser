@@ -27,6 +27,23 @@ async function loadAssistants(apiKey) {
       const info = document.createElement("div");
       info.textContent = "";
       details.appendChild(info);
+      const selectBtn = document.createElement("button");
+      selectBtn.className = "select-agent-btn";
+      selectBtn.textContent = "Select Agent";
+      selectBtn.addEventListener("click", () => {
+        chrome.storage.sync.set({ assistantId: a.id }, () => {
+          assistantId = a.id;
+          const input = document.getElementById("assistantId");
+          if (input) input.value = a.id;
+          const status = document.getElementById("agentStatus");
+          if (status) {
+            status.textContent = "Saved!";
+            status.style.display = "inline";
+            setTimeout(() => (status.style.display = "none"), 1500);
+          }
+        });
+      });
+      info.appendChild(selectBtn);
       details.addEventListener("toggle", async () => {
         if (!details.open || info.dataset.loaded) return;
         const d = await fetch(`https://api.openai.com/v1/assistants/${a.id}`, {
@@ -42,19 +59,6 @@ async function loadAssistants(apiKey) {
           `<p><b>Temperature:</b> ${full.temperature ?? ""}</p>` +
           `<p><b>Top P:</b> ${full.top_p ?? ""}</p>`;
         info.dataset.loaded = "1";
-      });
-      summary.addEventListener("click", () => {
-        chrome.storage.sync.set({ assistantId: a.id }, () => {
-          assistantId = a.id;
-          const input = document.getElementById("assistantId");
-          if (input) input.value = a.id;
-          const status = document.getElementById("agentStatus");
-          if (status) {
-            status.textContent = "Saved!";
-            status.style.display = "inline";
-            setTimeout(() => (status.style.display = "none"), 1500);
-          }
-        });
       });
       container.appendChild(details);
     });
@@ -121,9 +125,27 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btn) btn.classList.add("active");
   }
 
+  function switchSubTab(id) {
+    document.querySelectorAll("#agentsTab .sub-tab-content").forEach((div) =>
+      div.classList.add("hidden")
+    );
+    document.getElementById(id).classList.remove("hidden");
+    document.querySelectorAll("#agentsTab .sub-tab-link").forEach((b) =>
+      b.classList.remove("active")
+    );
+    const btn = document.querySelector(
+      `#agentsTab .sub-tab-link[data-sub-tab="${id}"]`
+    );
+    if (btn) btn.classList.add("active");
+  }
+
   document.querySelectorAll(".tab-link").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+
+  document
+    .querySelectorAll("#agentsTab .sub-tab-link")
+    .forEach((btn) => btn.addEventListener("click", () => switchSubTab(btn.dataset.subTab)));
 
   chrome.storage.sync.get(["model", "keyLocation", "assistantId"], (res) => {
     if (res.model) {

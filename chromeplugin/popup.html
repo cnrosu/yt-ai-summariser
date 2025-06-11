@@ -58,17 +58,24 @@
     </div>
 
     <div id="agentsTab" class="tab-content hidden">
-      <div id="agentList"></div>
-      <label for="assistantId">Current Assistant ID:</label>
-      <input type="text" id="assistantId" placeholder="asst_..." />
-      <button id="saveAgent">Save</button>
-      <span id="agentStatus" style="margin-left:10px;color:green;display:none;">Saved!</span>
+      <div class="sub-tab-nav">
+        <button class="sub-tab-link active" data-sub-tab="manageAgents">Manage Agents</button>
+        <button class="sub-tab-link" data-sub-tab="agentMakerSub">Agent Maker</button>
+      </div>
 
-      <hr />
-      <div id="agentMaker">
-        <h3>Agent Maker</h3>
-        <label for="newName">Name:</label>
-        <input type="text" id="newName" />
+      <div id="manageAgents" class="sub-tab-content">
+        <div id="agentList"></div>
+        <label for="assistantId">Current Assistant ID:</label>
+        <input type="text" id="assistantId" placeholder="asst_..." />
+        <button id="saveAgent">Save</button>
+        <span id="agentStatus" style="margin-left:10px;color:green;display:none;">Saved!</span>
+      </div>
+
+      <div id="agentMakerSub" class="sub-tab-content hidden">
+        <div id="agentMaker">
+          <h3>Agent Maker</h3>
+          <label for="newName">Name:</label>
+          <input type="text" id="newName" />
 
         <label for="newDescription">Description:</label>
         <input type="text" id="newDescription" />
@@ -100,15 +107,16 @@
         <label for="newTemp">Temperature: <span id="tempVal">1</span></label>
         <input type="range" id="newTemp" min="0" max="2" step="0.1" value="1" />
 
-        <label for="newTopP">Top P: <span id="topPVal">1</span></label>
-        <input type="range" id="newTopP" min="0" max="1" step="0.1" value="1" />
+          <label for="newTopP">Top P: <span id="topPVal">1</span></label>
+          <input type="range" id="newTopP" min="0" max="1" step="0.1" value="1" />
 
-        <div>
-          <label><input type="checkbox" name="tool" value="file_search" />file_search</label>
-          <label><input type="checkbox" name="tool" value="function" />function</label>
+          <div>
+            <label><input type="checkbox" name="tool" value="file_search" />file_search</label>
+            <label><input type="checkbox" name="tool" value="function" />function</label>
+          </div>
+
+          <button id="createCustomAssistant">Create Assistant</button>
         </div>
-
-        <button id="createCustomAssistant">Create Assistant</button>
       </div>
     </div>
 
