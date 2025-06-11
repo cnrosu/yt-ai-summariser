@@ -4,6 +4,9 @@ This document describes the HTTP endpoints exposed by `yt_ai_server.py`. The ser
 
 All endpoints are prefixed with `/api` and by default the server listens on `http://localhost:5010`.
 
+This document merges the original `SERVER_API.md` and `api-reference.md` files into a
+single reference that also explains how the server is structured internally.
+
 ## Architecture Overview
 
 ```
@@ -22,7 +25,42 @@ Chrome Extension <--HTTP--> Flask Server -- faster-whisper & yt_dlp --> Transcri
    - Caches the transcript and any generated Q&A pairs in `chromeplugin/transcripts/<video_id>/`.
    - Exposes a small REST API for the extension.
 
-The server keeps track of active transcription jobs in memory. Jobs are processed in background threads so that the API remains responsive.
+The server keeps track of active transcription jobs in memory. Jobs are processed
+in background threads so that the API remains responsive.
+
+### Data Flow
+
+1. The extension calls `/api/transcribe` with a YouTube URL.
+2. The server spawns a background job that downloads the audio using `yt_dlp`,
+   runs the faster-whisper model and saves the transcript on disk.
+3. Job progress can be polled via `/api/status` until the transcript is ready.
+4. Cached transcripts and any question/answer pairs are served directly from
+   the `chromeplugin/transcripts/<video_id>/` folder.
+
+### File Layout
+
+```
+chromeplugin/transcripts/
+  <video_id>/
+    <video_id>.txt       # saved transcript
+    <video_id>_qa.txt    # Q&A pairs appended as JSON lines
+```
+
+`ffmpeg/bin` contains the FFmpeg binaries used by `yt_dlp` to extract audio. The
+server adjusts the `PATH` environment variable at startup so these binaries are
+found without requiring a system-wide installation.
+
+### Job Lifecycle
+
+Jobs are stored in an in-memory dictionary and marked with one of the following
+statuses:
+
+- `queued` – waiting for a worker thread to start processing.
+- `downloading` – audio is being fetched with `yt_dlp`.
+- `transcribing` – faster-whisper is generating a transcript.
+- `done` – transcription completed successfully and was cached.
+- `error` – an exception occurred; details are returned via `/api/status`.
+- `cancelled` – set when `/api/kill` is called for a running job.
 
 ## Endpoints
 
