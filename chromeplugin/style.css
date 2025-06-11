@@ -234,3 +234,27 @@ details[open] .copy-icon {
     transform: rotate(360deg);
   }
 }
+
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tab-link {
+  flex: 1;
+  padding: 6px;
+  background: #e8eaed;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+
+.tab-link.active {
+  background: #fff;
+  border-bottom: 2px solid #1a73e8;
+}
+
+.tab-content.hidden {
+  display: none;
+}
