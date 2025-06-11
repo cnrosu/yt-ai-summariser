@@ -203,9 +203,11 @@ document.addEventListener("DOMContentLoaded", () => {
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
   }
 
-  function attachInteractions(details, answerDiv) {
+  function attachInteractions(details, answerDiv, question) {
     let startX;
     let timer;
+    const summary = details.querySelector("summary");
+
     const copyIcon = document.createElement("span");
     copyIcon.className = "copy-icon";
     copyIcon.textContent = "\ud83d\udccb";
@@ -217,6 +219,18 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => details.classList.remove("copied"), 800);
     });
     details.appendChild(copyIcon);
+
+    const delIcon = document.createElement("span");
+    delIcon.className = "delete-icon";
+    delIcon.textContent = "\u274c";
+    delIcon.title = "Delete";
+    delIcon.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      details.remove();
+      removeQA(question);
+    });
+    summary.appendChild(delIcon);
     details.addEventListener("pointerdown", (e) => {
       startX = e.clientX;
       timer = setTimeout(() => {
@@ -232,7 +246,10 @@ document.addEventListener("DOMContentLoaded", () => {
         details.classList.add("swipe-remove");
         details.addEventListener(
           "transitionend",
-          () => details.remove(),
+          () => {
+            details.remove();
+            removeQA(question);
+          },
           { once: true }
         );
       }
@@ -270,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
     details.appendChild(summary);
     details.appendChild(answerDiv);
     qaContainer.prepend(details);
-    attachInteractions(details, answerDiv);
+    attachInteractions(details, answerDiv, question);
 
     const first = qaHistory.length === 0;
     const content = first
@@ -404,7 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
         details.appendChild(summary);
         details.appendChild(answerDiv);
         qaContainer.prepend(details);
-        attachInteractions(details, answerDiv);
+        attachInteractions(details, answerDiv, item.question);
       });
     });
   }
@@ -423,6 +440,17 @@ document.addEventListener("DOMContentLoaded", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ videoId: currentVideoId, question, answer }),
     }).catch((err) => console.error("Failed to save QA", err));
+  }
+
+  function removeQA(question) {
+    if (!currentVideoId) return;
+    const key = `qa_${currentVideoId}`;
+    chrome.storage.local.get(key, (res) => {
+      let arr = res[key] || [];
+      arr = arr.filter((item) => item.question !== question);
+      chrome.storage.local.set({ [key]: arr });
+      qaHistory = arr.slice();
+    });
   }
 
   async function generateSuggestions() {
