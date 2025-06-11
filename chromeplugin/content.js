@@ -99,7 +99,12 @@ function addTranscribeButton() {
 
 function pollStatus(jobId, videoId) {
   fetch(`http://localhost:5010/api/status?jobId=${jobId}`)
-    .then(res => res.json())
+    .then(res => {
+      if (res.status === 404) {
+        return { status: "error", error: "Job not found" };
+      }
+      return res.json();
+    })
     .then(data => {
       const btn = document.getElementById("yt-ai-btn");
       const container = document.getElementById("yt-ai-container");
