@@ -203,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
   }
 
-  function attachInteractions(details, answerDiv, question) {
+  function attachInteractions(wrapper, details, answerDiv, question) {
     let startX;
     let timer;
     const summary = details.querySelector("summary");
@@ -227,10 +227,10 @@ document.addEventListener("DOMContentLoaded", () => {
     delIcon.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      details.remove();
+      wrapper.remove();
       removeQA(question);
     });
-    summary.appendChild(delIcon);
+    wrapper.appendChild(delIcon);
     details.addEventListener("pointerdown", (e) => {
       startX = e.clientX;
       timer = setTimeout(() => {
@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
         details.addEventListener(
           "transitionend",
           () => {
-            details.remove();
+            wrapper.remove();
             removeQA(question);
           },
           { once: true }
@@ -270,6 +270,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (!question) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "qa-item";
+
     const details = document.createElement("details");
     details.className = "card fade-in loading";
     const summary = document.createElement("summary");
@@ -286,8 +289,9 @@ document.addEventListener("DOMContentLoaded", () => {
     answerDiv.innerHTML = "Loading...";
     details.appendChild(summary);
     details.appendChild(answerDiv);
-    qaContainer.prepend(details);
-    attachInteractions(details, answerDiv, question);
+    wrapper.appendChild(details);
+    qaContainer.prepend(wrapper);
+    attachInteractions(wrapper, details, answerDiv, question);
 
     const first = qaHistory.length === 0;
     const content = first
@@ -412,6 +416,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const arr = res[key] || [];
       qaHistory = arr.slice();
       arr.forEach((item) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "qa-item";
+
         const details = document.createElement("details");
         details.className = "card fade-in";
         const summary = document.createElement("summary");
@@ -420,8 +427,9 @@ document.addEventListener("DOMContentLoaded", () => {
         answerDiv.innerHTML = item.answer;
         details.appendChild(summary);
         details.appendChild(answerDiv);
-        qaContainer.prepend(details);
-        attachInteractions(details, answerDiv, item.question);
+        wrapper.appendChild(details);
+        qaContainer.prepend(wrapper);
+        attachInteractions(wrapper, details, answerDiv, item.question);
       });
     });
   }

@@ -124,14 +124,19 @@ details[open] .copy-icon {
   opacity: 1;
 }
 
+.qa-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .delete-icon {
-  position: absolute;
-  top: 4px;
-  right: 6px;
   cursor: pointer;
   font-size: 16px;
   opacity: 0.8;
   color: #d33;
+  user-select: none;
+  margin-top: 8px;
 }
 
 .delete-icon:hover {
