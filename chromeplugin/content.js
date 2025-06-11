@@ -1,8 +1,16 @@
+let statusInterval = null;
+let currentJobId = null;
+
 function addTranscribeButton() {
-  // Remove any stale container.
+  // Remove any stale container and stop any existing polling.
   const existingContainer = document.getElementById("yt-ai-container");
   if (existingContainer) {
     existingContainer.remove();
+  }
+  if (statusInterval) {
+    clearInterval(statusInterval);
+    statusInterval = null;
+    currentJobId = null;
   }
 
   // Create a new container.
@@ -37,7 +45,19 @@ function addTranscribeButton() {
     btn.innerText = "Transcribing...";
     btn.disabled = true;
     chrome.runtime.sendMessage({ action: "transcribe", url: window.location.href }, (response) => {
-      // Additional UI feedback can be added here.
+      if (!response || !response.success) {
+        btn.innerText = "Error";
+        container.style.backgroundColor = "red";
+        return;
+      }
+      if (response.cached) {
+        btn.innerText = "Done!";
+        container.style.backgroundColor = "green";
+        btn.disabled = false;
+      } else if (response.jobId) {
+        currentJobId = response.jobId;
+        statusInterval = setInterval(() => pollStatus(response.jobId, response.videoId), 1000);
+      }
     });
   };
 
@@ -54,9 +74,14 @@ function addTranscribeButton() {
   `;
   closeBtn.onclick = () => {
     document.getElementById("yt-ai-container")?.remove();
-    chrome.runtime.sendMessage({ action: "killJob" }, (response) => {
+    if (statusInterval) {
+      clearInterval(statusInterval);
+      statusInterval = null;
+    }
+    chrome.runtime.sendMessage({ action: "killJob", jobId: currentJobId }, (response) => {
       console.log("Kill job response:", response);
     });
+    currentJobId = null;
   };
 
   container.appendChild(closeBtn);
@@ -69,6 +94,41 @@ function addTranscribeButton() {
       clearInterval(checkPlayerInterval);
     }
   }, 500);
+}
+
+function pollStatus(jobId, videoId) {
+  fetch(`http://localhost:5010/api/status?jobId=${jobId}`)
+    .then(res => res.json())
+    .then(data => {
+      const btn = document.getElementById("yt-ai-btn");
+      const container = document.getElementById("yt-ai-container");
+      if (!btn || !container) return;
+      if (data.status === "downloading") {
+        btn.innerText = "Downloading...";
+        container.style.backgroundColor = "#1a73e8";
+      } else if (data.status === "transcribing") {
+        btn.innerText = "Transcribing...";
+        container.style.backgroundColor = "#1a73e8";
+      } else if (data.status === "done") {
+        clearInterval(statusInterval);
+        statusInterval = null;
+        currentJobId = null;
+        btn.innerText = "Done!";
+        container.style.backgroundColor = "green";
+        const transcript = data.transcript;
+        const compressed = LZString.compressToUTF16(transcript);
+        chrome.storage.local.set({ [`transcript_${videoId}`]: compressed });
+        btn.disabled = false;
+      } else if (data.status === "error") {
+        clearInterval(statusInterval);
+        statusInterval = null;
+        currentJobId = null;
+        btn.innerText = "Error";
+        container.style.backgroundColor = "red";
+        btn.disabled = false;
+      }
+    })
+    .catch(err => console.error("Polling error", err));
 }
 
 function loadCachedTranscript() {
