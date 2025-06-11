@@ -101,6 +101,11 @@ function pollStatus(jobId, videoId) {
   fetch(`http://localhost:5010/api/status?jobId=${jobId}`)
     .then(res => {
       if (res.status === 404) {
+        if (statusInterval) {
+          clearInterval(statusInterval);
+          statusInterval = null;
+        }
+        currentJobId = null;
         return { status: "error", error: "Job not found" };
       }
       return res.json();
