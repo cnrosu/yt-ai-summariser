@@ -17,24 +17,27 @@
       <button class="tab-link" data-tab="agentsTab">Agents</button>
     </div>
 
-    <div id="chatTab" class="tab-content">
-      <textarea id="transcriptBox" rows="10" readonly class="hidden"></textarea>
+      <div id="chatTab" class="tab-content">
+        <textarea id="transcriptBox" rows="10" readonly class="hidden"></textarea>
 
-      <div id="quickActions">
-        <button class="action-btn" data-type="summary">Summarize</button>
-        <button class="action-btn" data-type="fact">Fact Check</button>
-        <button class="action-btn" data-type="insights">Insights</button>
+        <h3 class="section-title">General</h3>
+        <div id="quickActions">
+          <button class="action-btn" data-type="summary">Summarize</button>
+          <button class="action-btn" data-type="fact">Fact Check</button>
+          <button class="action-btn" data-type="insights">Insights</button>
+        </div>
+
+        <h3 class="section-title">AI Suggestions</h3>
+        <div id="suggested" class="suggested"></div>
+
+        <h3 class="section-title">Ask Anything</h3>
+        <div id="chatContainer">
+          <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
+          <button id="chatSend" class="material-icons">send</button>
+        </div>
+
+        <div id="qaContainer"></div>
       </div>
-
-      <div id="suggested" class="suggested"></div>
-
-      <div id="chatContainer">
-        <textarea id="chatInput" rows="2" placeholder="Ask a question..."></textarea>
-        <button id="chatSend" class="material-icons">send</button>
-      </div>
-
-      <div id="qaContainer"></div>
-    </div>
 
     <div id="settingsTab" class="tab-content hidden">
       <label for="apiKey">OpenAI API Key:</label>
