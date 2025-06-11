@@ -77,6 +77,7 @@ async function loadAssistants(apiKey) {
 }
 
 async function createCustomAssistant(apiKey) {
+  const format = document.getElementById("newResponseFormat").value;
   const body = {
     model: document.getElementById("newModel").value,
     name: document.getElementById("newName").value.trim(),
@@ -84,8 +85,7 @@ async function createCustomAssistant(apiKey) {
     instructions: document.getElementById("newInstructions").value.trim(),
     temperature: parseFloat(document.getElementById("newTemp").value),
     top_p: parseFloat(document.getElementById("newTopP").value),
-    response_format: { type: document.getElementById("newResponseFormat").value },
-    metadata: { reasoning_effort: document.getElementById("newReasoning").value },
+    response_format: format === "auto" ? "auto" : { type: format },
     tools: Array.from(document.querySelectorAll("input[name='tool']:checked"))
       .map((c) => ({ type: c.value })),
   };
