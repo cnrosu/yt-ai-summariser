@@ -25,6 +25,42 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
   });
 
+  function attachInteractions(details, answerDiv) {
+    let startX;
+    let timer;
+    const copyIcon = document.createElement("span");
+    copyIcon.className = "copy-icon";
+    copyIcon.textContent = "📋";
+    copyIcon.title = "Copy";
+    copyIcon.addEventListener("click", () => {
+      navigator.clipboard.writeText(answerDiv.innerText || "").catch(() => {});
+      details.classList.add("copied");
+      setTimeout(() => details.classList.remove("copied"), 800);
+    });
+    details.appendChild(copyIcon);
+    details.addEventListener("pointerdown", (e) => {
+      startX = e.clientX;
+      timer = setTimeout(() => {
+        navigator.clipboard.writeText(answerDiv.innerText || "").catch(() => {});
+        details.classList.add("copied");
+        setTimeout(() => details.classList.remove("copied"), 800);
+      }, 600);
+    });
+    details.addEventListener("pointerup", (e) => {
+      clearTimeout(timer);
+      if (startX !== undefined && Math.abs(e.clientX - startX) > 80) {
+        details.classList.add("swipe-remove");
+        details.addEventListener(
+          "transitionend",
+          () => details.remove(),
+          { once: true }
+        );
+      }
+      startX = undefined;
+    });
+    details.addEventListener("pointerleave", () => clearTimeout(timer));
+  }
+
   async function handleQuestion(question) {
     const apiKey = storedApiKey;
     const transcript = transcriptBox.value.trim();
@@ -38,14 +74,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (!question) return;
     const details = document.createElement("details");
-    details.className = "card";
+    details.className = "card fade-in";
     const summary = document.createElement("summary");
-    summary.textContent = question;
+    summary.textContent = question + " ";
+    const loader = document.createElement("span");
+    loader.className = "loader";
+    summary.appendChild(loader);
     const answerDiv = document.createElement("div");
     answerDiv.innerHTML = "Loading...";
     details.appendChild(summary);
     details.appendChild(answerDiv);
     qaContainer.prepend(details);
+    attachInteractions(details, answerDiv);
 
     const messages = [
       {
@@ -60,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const reply = await sendToGPT(messages, apiKey);
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
+    summary.removeChild(loader);
     saveQA(question, clean);
   }
 
@@ -130,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const arr = res[key] || [];
       arr.forEach((item) => {
         const details = document.createElement("details");
-        details.className = "card";
+        details.className = "card fade-in";
         const summary = document.createElement("summary");
         summary.textContent = item.question;
         const answerDiv = document.createElement("div");
@@ -138,6 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
         details.appendChild(summary);
         details.appendChild(answerDiv);
         qaContainer.prepend(details);
+        attachInteractions(details, answerDiv);
       });
     });
   }
