@@ -3,6 +3,15 @@ importScripts("lz-string.min.js");
 // Global mapping: track active job IDs per tab. Polling now happens in content.js.
 const activeJobs = {};
 
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const job = activeJobs[tabId];
+  if (job && job.jobId) {
+    fetch(`http://localhost:5010/api/kill?jobId=${job.jobId}`, { method: "POST" })
+      .catch(err => console.error("Error killing job on tab close:", err));
+    delete activeJobs[tabId];
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "transcribe") {
     const url = message.url;
@@ -38,7 +47,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           .then(data => {
             if (data.error) {
               console.error("Error starting transcription job:", data.error);
-              updateUI(tabId, "Error", "red");
+              updateUI(tabId, data.error, "red");
               sendResponse({ success: false, error: data.error });
               return;
             }
@@ -65,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           })
           .catch(err => {
             console.error("Transcription error:", err);
-            updateUI(tabId, "Error", "red");
+            updateUI(tabId, "Server offline", "red");
             sendResponse({ success: false, error: err.message });
           });
       }

@@ -7,7 +7,13 @@
   <h2>Settings</h2>
 
   <label for="apiKey">OpenAI API Key:</label>
-  <input type="text" id="apiKey" placeholder="sk-..." />
+  <input type="password" id="apiKey" placeholder="sk-..." />
+
+  <label for="keyLocation">Store API key in:</label>
+  <select id="keyLocation">
+    <option value="sync">Chrome Sync</option>
+    <option value="local">Local Only</option>
+  </select>
 
   <label for="modelSelect">Choose AI Model:</label>
   <select id="modelSelect">
