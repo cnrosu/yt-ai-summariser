@@ -146,3 +146,17 @@ def test_job_listener_count(monkeypatch, tmp_path):
     kill2 = client.post("/api/kill", query_string={"jobId": jid}).get_json()
     assert kill2["status"] == "cancelled"
 
+
+def test_kill_sets_killed_flag(app):
+    client, server = app
+    url = "https://www.youtube.com/watch?v=kill123"
+
+    resp = client.post("/api/transcribe", json={"url": url}).get_json()
+    jid = resp["jobId"]
+
+    kill = client.post("/api/kill", query_string={"jobId": jid}).get_json()
+    assert kill["success"] is True
+    assert kill["status"] == "cancelled"
+    assert kill["listeners"] == 0
+    assert server.jobs[jid]["killed"] is True
+
