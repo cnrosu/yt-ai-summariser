@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           model: modelSelect.value,
-          name: "YouTranscribe",
+          name: "asst_YouTranscribe",
           instructions:
             "You are a YouTube video transcription AI. Answer questions about the provided transcript in concise HTML.",
         }),
