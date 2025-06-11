@@ -1,11 +1,21 @@
 let statusInterval = null;
 let currentJobId = null;
+let playerInterval = null;
+let containerRef = null;
 
 function addTranscribeButton() {
   // Remove any stale container and stop any existing polling.
+  if (containerRef) {
+    containerRef.remove();
+    containerRef = null;
+  }
   const existingContainer = document.getElementById("yt-ai-container");
   if (existingContainer) {
     existingContainer.remove();
+  }
+  if (playerInterval) {
+    clearInterval(playerInterval);
+    playerInterval = null;
   }
   if (statusInterval) {
     clearInterval(statusInterval);
@@ -79,20 +89,28 @@ function addTranscribeButton() {
       clearInterval(statusInterval);
       statusInterval = null;
     }
+    if (playerInterval) {
+      clearInterval(playerInterval);
+      playerInterval = null;
+    }
     chrome.runtime.sendMessage({ action: "killJob", jobId: currentJobId }, (response) => {
       console.log("Kill job response:", response);
     });
     currentJobId = null;
+    containerRef = null;
   };
 
   container.appendChild(closeBtn);
 
+  containerRef = container;
+
   // Insert the container when the YouTube player is ready.
-  const checkPlayerInterval = setInterval(() => {
+  playerInterval = setInterval(() => {
     const player = document.querySelector(".html5-video-player");
-    if (player) {
-      player.appendChild(container);
-      clearInterval(checkPlayerInterval);
+    if (player && containerRef) {
+      player.appendChild(containerRef);
+      clearInterval(playerInterval);
+      playerInterval = null;
     }
   }, 500);
 }
