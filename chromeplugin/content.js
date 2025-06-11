@@ -102,30 +102,37 @@ function pollStatus(jobId, videoId) {
     .then(data => {
       const btn = document.getElementById("yt-ai-btn");
       const container = document.getElementById("yt-ai-container");
-      if (!btn || !container) return;
       if (data.status === "downloading") {
-        btn.innerText = "Downloading...";
-        container.style.backgroundColor = "#1a73e8";
+        if (btn && container) {
+          btn.innerText = "Downloading...";
+          container.style.backgroundColor = "#1a73e8";
+        }
       } else if (data.status === "transcribing") {
-        btn.innerText = "Transcribing...";
-        container.style.backgroundColor = "#1a73e8";
+        if (btn && container) {
+          btn.innerText = "Transcribing...";
+          container.style.backgroundColor = "#1a73e8";
+        }
       } else if (data.status === "done") {
         clearInterval(statusInterval);
         statusInterval = null;
         currentJobId = null;
-        btn.innerText = "Done!";
-        container.style.backgroundColor = "green";
         const transcript = data.transcript;
         const compressed = LZString.compressToUTF16(transcript);
         chrome.storage.local.set({ [`transcript_${videoId}`]: compressed });
-        btn.disabled = false;
+        if (btn && container) {
+          btn.innerText = "Done!";
+          container.style.backgroundColor = "green";
+          btn.disabled = false;
+        }
       } else if (data.status === "error") {
         clearInterval(statusInterval);
         statusInterval = null;
         currentJobId = null;
-        btn.innerText = "Error";
-        container.style.backgroundColor = "red";
-        btn.disabled = false;
+        if (btn && container) {
+          btn.innerText = "Error";
+          container.style.backgroundColor = "red";
+          btn.disabled = false;
+        }
       }
     })
     .catch(err => console.error("Polling error", err));
