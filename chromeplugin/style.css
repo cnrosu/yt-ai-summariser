@@ -97,6 +97,10 @@ button:active {
   background: #d2ffd2;
 }
 
+.card.loading summary {
+  pointer-events: none;
+}
+
 .copy-icon {
   position: absolute;
   bottom: 4px;

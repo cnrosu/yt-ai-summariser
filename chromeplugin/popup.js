@@ -77,8 +77,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (!question) return;
     const details = document.createElement("details");
-    details.className = "card fade-in";
+    details.className = "card fade-in loading";
     const summary = document.createElement("summary");
+    summary.addEventListener("click", (e) => {
+      if (details.classList.contains("loading")) {
+        e.preventDefault();
+      }
+    });
     summary.textContent = question + " ";
     const loader = document.createElement("span");
     loader.className = "loader";
@@ -104,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
     summary.removeChild(loader);
+    details.classList.remove("loading");
     saveQA(question, clean);
   }
 
