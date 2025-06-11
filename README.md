@@ -1,4 +1,4 @@
-# yt-ai-summariser
+# YouTranscribe - AI Powered Youtube Video Transcription
 
 Chrome extension and Python backend for transcribing YouTube videos with the **faster-whisper** model and analysing them using GPT models. The extension, **YouTranscribe**, now provides a Material-style UI with quick actions, suggested questions and a dedicated settings page for your API key.
 
