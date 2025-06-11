@@ -28,14 +28,25 @@ print("Whisper model loaded on", DEVICE)
 # Global dictionary to hold active job statuses and results (transient).
 jobs = {}
 
-# Persistent caching: transcripts are stored in chromeplugin/transcripts relative
-# to the repository root.
+# Persistent caching: each video gets its own folder under
+# chromeplugin/transcripts where the transcript and any saved QA pairs are
+# stored uncompressed.
 CACHE_DIR = os.path.join(BASE_DIR, "chromeplugin", "transcripts")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+def get_video_dir(video_id):
+    """Return directory path for a given video id."""
+    video_dir = os.path.join(CACHE_DIR, video_id)
+    os.makedirs(video_dir, exist_ok=True)
+    return video_dir
+
 def get_cache_filename(video_id):
-    """Return the full path of the cache file for the given video id."""
-    return os.path.join(CACHE_DIR, f"{video_id}.json")
+    """Return the transcript file for the video."""
+    return os.path.join(get_video_dir(video_id), f"{video_id}.txt")
+
+def get_qa_filename(video_id):
+    """Return the QA file for the video."""
+    return os.path.join(get_video_dir(video_id), f"{video_id}_qa.txt")
 
 def process_job(job_id, url, video_id):
     try:
@@ -64,11 +75,10 @@ def process_job(job_id, url, video_id):
         jobs[job_id]['status'] = "done"
         jobs[job_id]['transcript'] = transcript
 
-        # Save the transcript persistently as a JSON file.
-        cache_data = {"video_id": video_id, "transcript": transcript}
+        # Save the transcript persistently as plain text in the video folder.
         cache_filename = get_cache_filename(video_id)
         with open(cache_filename, "w", encoding="utf-8") as f:
-            json.dump(cache_data, f)
+            f.write(transcript)
         print("Cached transcript to", cache_filename)
 
         os.remove(audio_file)
@@ -99,10 +109,10 @@ def start_transcription():
     cache_filename = get_cache_filename(video_id)
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
-            cache_data = json.load(f)
+            transcript = f.read()
         print("Found cached transcript for video ID:", video_id,
-              "len=", len(cache_data["transcript"]))
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+              "len=", len(transcript))
+        return jsonify({"transcript": transcript, "cached": True})
     # Otherwise, start a new transcription job.
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "queued"}
@@ -138,12 +148,26 @@ def load_transcript():
     cache_filename = get_cache_filename(video_id)
     if os.path.isfile(cache_filename):
         with open(cache_filename, "r", encoding="utf-8") as f:
-            cache_data = json.load(f)
+            transcript = f.read()
         print("Loaded cached transcript for video id:", video_id,
-              "len=", len(cache_data["transcript"]))
-        return jsonify({"transcript": cache_data["transcript"], "cached": True})
+              "len=", len(transcript))
+        return jsonify({"transcript": transcript, "cached": True})
     else:
         return jsonify({"error": "Transcript not found"}), 404
+
+@app.route("/api/save_qa", methods=["POST"])
+def save_qa():
+    data = request.get_json() or {}
+    video_id = data.get("videoId") or data.get("video_id")
+    question = data.get("question")
+    answer = data.get("answer")
+    if not video_id or question is None or answer is None:
+        return jsonify({"error": "videoId, question and answer are required"}), 400
+    qa_file = get_qa_filename(video_id)
+    entry = {"question": question, "answer": answer}
+    with open(qa_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
     print("🚀 Starting YouTranscribe server on http://localhost:5010")
