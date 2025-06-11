@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (res.assistantId) {
       assistantId = res.assistantId;
+      console.log("Loaded Assistant ID from storage:", assistantId);
     }
     const location = res.keyLocation || "sync";
     const storage = location === "local" ? chrome.storage.local : chrome.storage.sync;
@@ -24,9 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (r.apiKey) {
         storedApiKey = r.apiKey;
         if (!assistantId) {
+          console.log("No assistant ID found, creating standard assistant");
           assistantId = await createStandardAssistant(r.apiKey);
           if (assistantId) {
             chrome.storage.sync.set({ assistantId });
+            console.log("Stored new Assistant ID", assistantId);
           }
         }
         if (transcriptBox.value.trim()) {
@@ -282,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const key = `thread_${videoId}`;
     chrome.storage.local.get(key, (res) => {
       threadId = res[key] || null;
+      console.log("Loaded thread ID from storage:", threadId);
     });
   }
 
@@ -293,11 +297,13 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: {
           Authorization: `Bearer ${storedApiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({}),
       });
       const data = await res.json();
       threadId = data.id;
+      console.log("Created thread with ID", threadId);
       if (currentVideoId && threadId) {
         chrome.storage.local.set({ [`thread_${currentVideoId}`]: threadId });
       }
@@ -311,18 +317,21 @@ document.addEventListener("DOMContentLoaded", () => {
       return "Assistant ID not set.";
     }
     await ensureThread();
+    console.log("Using thread ID", threadId);
     if (!threadId) {
       return "Failed to create thread.";
     }
     const headers = {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "OpenAI-Beta": "assistants=v2",
     };
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
       body: JSON.stringify({ role: "user", content }),
     });
+    console.log("Posted user message to thread");
     const runRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
       method: "POST",
       headers,
@@ -333,6 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return `Error: ${run.error.message}`;
     }
     const runId = run.id;
+    console.log("Run created", runId);
     while (true) {
       await new Promise((r) => setTimeout(r, 1500));
       const statusRes = await fetch(
@@ -350,16 +360,19 @@ document.addEventListener("DOMContentLoaded", () => {
       { headers }
     );
     const msgData = await msgRes.json();
+    console.log("Assistant reply received");
     return msgData.data?.[0]?.content?.[0]?.text?.value || "";
   }
 
   async function createStandardAssistant(apiKey) {
+    console.log("Creating standard assistant");
     try {
       const res = await fetch("https://api.openai.com/v1/assistants", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({
           model: currentModel,
@@ -369,6 +382,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }),
       });
       const data = await res.json();
+      console.log("Assistant API response", data);
+      if (data.id) console.log("Created assistant ID", data.id);
       return data.id || null;
     } catch (err) {
       console.error("Failed to create assistant", err);

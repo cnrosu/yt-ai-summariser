@@ -58,12 +58,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   async function createStandardAssistant(apiKey) {
+    console.log("Creating standard assistant from settings");
     try {
       const res = await fetch("https://api.openai.com/v1/assistants", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({
           model: modelSelect.value,
@@ -73,6 +75,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }),
       });
       const data = await res.json();
+      console.log("Assistant API response", data);
+      if (data.id) console.log("Created assistant ID", data.id);
       return data.id || null;
     } catch (err) {
       console.error("Failed to create assistant", err);
