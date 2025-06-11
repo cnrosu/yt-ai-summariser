@@ -17,13 +17,31 @@ document.addEventListener("DOMContentLoaded", () => {
     storage.get(["apiKey"], (r) => {
       if (r.apiKey) {
         storedApiKey = r.apiKey;
-        if (transcriptBox.value.trim()) {
-          generateSuggestions();
-        }
+  function attachInteractions(details, summary, answerDiv, isLoading) {
+    copyIcon.textContent = "\u{1F4CB}";
+    if (isLoading) copyIcon.style.display = "none";
+
+    details.dataset.loading = isLoading ? "true" : "false";
+    details.addEventListener("click", (e) => {
+      if (details.dataset.loading === "true" && e.target === summary) {
+        e.preventDefault();
       }
     });
-  });
 
+      if (details.dataset.loading === "true") return;
+      if (
+        details.dataset.loading !== "true" &&
+        startX !== undefined &&
+        Math.abs(e.clientX - startX) > 80
+      ) {
+      }
+    });
+
+    return copyIcon;
+    const icon = attachInteractions(details, summary, answerDiv, true);
+
+    details.dataset.loading = "false";
+    icon.style.display = "";
   document.getElementById("settingsBtn").addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
   });
@@ -154,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const compressed = result[key];
       if (!compressed) {
         transcriptBox.value = "Transcript not found. Try reloading.";
-        return;
+        attachInteractions(details, summary, answerDiv, false);
       }
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {

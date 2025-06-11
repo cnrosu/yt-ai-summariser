@@ -83,6 +83,11 @@ button:active {
   opacity: 0;
 }
 
+.card.loading > summary {
+  cursor: default;
+  user-select: none;
+}
+
 @keyframes fadeIn {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -95,6 +100,10 @@ button:active {
 
 .card.copied {
   background: #d2ffd2;
+}
+
+.card.loading .copy-icon {
+  display: none !important;
 }
 
 .copy-icon {
