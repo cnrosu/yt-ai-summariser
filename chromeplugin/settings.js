@@ -65,6 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
         },
         body: JSON.stringify({
           model: modelSelect.value,
