@@ -3,6 +3,11 @@ let currentJobId = null;
 let playerInterval = null;
 let containerRef = null;
 
+function setLoading(btn, text) {
+  if (!btn) return;
+  btn.innerHTML = `${text} <span class="loader loader-white"></span>`;
+}
+
 function addTranscribeButton() {
   // Remove any stale container and stop any existing polling.
   if (containerRef) {
@@ -52,7 +57,7 @@ function addTranscribeButton() {
     cursor: pointer;
   `;
   btn.onclick = () => {
-    btn.innerText = "Transcribing...";
+    setLoading(btn, "Transcribing...");
     btn.disabled = true;
     chrome.runtime.sendMessage({ action: "transcribe", url: window.location.href }, (response) => {
       if (!response || !response.success) {
@@ -133,7 +138,7 @@ function pollStatus(jobId, videoId) {
         }
       } else if (data.status === "transcribing") {
         if (btn && container) {
-          btn.innerText = "Transcribing...";
+          setLoading(btn, "Transcribing...");
           container.style.backgroundColor = "#1a73e8";
         }
       } else if (data.status === "done") {
