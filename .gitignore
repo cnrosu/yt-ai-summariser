@@ -1,1 +1,13 @@
 api key.txt
+
+# Python cache directories
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+
+# Transcripts and QA files
+chromeplugin/transcripts/
+*transcript*
+*qa*
