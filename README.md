@@ -26,7 +26,8 @@ Transcripts are cached per video on disk and in the browser. Any questions you a
    ```bash
    python yt_ai_server.py
    ```
-   The API is now available on `http://localhost:5010` by default.
+   The API is now available on `http://localhost:5010` by default, with CORS
+   enabled so the Chrome extension can connect.
 5. Load the `chromeplugin/` folder as an unpacked extension in Chrome to use the UI.
 
 See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for details on the available endpoints and how to run the server. For information about the automated test suite see [docs/TESTING.md](docs/TESTING.md).

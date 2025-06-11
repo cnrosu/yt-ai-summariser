@@ -1,6 +1,7 @@
 """Flask server for downloading and transcribing YouTube videos."""
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import sys
 import subprocess
 from faster_whisper import WhisperModel
@@ -36,6 +37,7 @@ logging.basicConfig(level=logging.INFO,
 LOGGER = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 
 LOGGER.info("Loading faster-whisper model once at startup...")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
