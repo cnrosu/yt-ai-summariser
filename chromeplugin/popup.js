@@ -11,19 +11,43 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatInput = document.getElementById("chatInput");
   const suggested = document.getElementById("suggested");
 
+  function switchTab(id) {
+    document.querySelectorAll(".tab-content").forEach((div) =>
+      div.classList.add("hidden")
+    );
+    document.getElementById(id).classList.remove("hidden");
+    document.querySelectorAll(".tab-link").forEach((b) =>
+      b.classList.remove("active")
+    );
+    const btn = document.querySelector(`.tab-link[data-tab="${id}"]`);
+    if (btn) btn.classList.add("active");
+  }
+
+  document.querySelectorAll(".tab-link").forEach((btn) => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  });
+
   chrome.storage.sync.get(["model", "keyLocation", "assistantId"], (res) => {
     if (res.model) {
       currentModel = res.model;
+      const sel = document.getElementById("modelSelect");
+      if (sel) sel.value = res.model;
     }
     if (res.assistantId) {
       assistantId = res.assistantId;
+      const input = document.getElementById("assistantId");
+      if (input) input.value = res.assistantId;
       console.log("Loaded Assistant ID from storage:", assistantId);
     }
     const location = res.keyLocation || "sync";
+    const locSel = document.getElementById("keyLocation");
+    if (locSel) locSel.value = location;
     const storage = location === "local" ? chrome.storage.local : chrome.storage.sync;
     storage.get(["apiKey"], async (r) => {
       if (r.apiKey) {
         storedApiKey = r.apiKey;
+        const keyInput = document.getElementById("apiKey");
+        if (keyInput) keyInput.value = r.apiKey;
         if (!assistantId) {
           console.log("No assistant ID found, creating standard assistant");
           assistantId = await createStandardAssistant(r.apiKey);
@@ -40,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("settingsBtn").addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+    switchTab("settingsTab");
   });
 
   function showCopyPopup(el) {
@@ -93,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKey = storedApiKey;
     const transcript = transcriptBox.value.trim();
     if (!apiKey) {
-      alert("Missing API key. Please enter it on the settings page.");
+      alert("Missing API key. Please enter it on the settings tab.");
       return;
     }
     if (!transcript || transcript.startsWith("Transcript not found")) {
@@ -161,6 +185,61 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       handleQuestion(prompt);
     });
+  });
+
+  const saveStatus = document.getElementById("statusMsg");
+  document.getElementById("saveSettings")?.addEventListener("click", () => {
+    const selectedModel = document.getElementById("modelSelect").value;
+    const apiKey = document.getElementById("apiKey").value.trim();
+    const keyLocation = document.getElementById("keyLocation").value;
+    chrome.storage.sync.set({ model: selectedModel, keyLocation }, () => {
+      const storage =
+        keyLocation === "local" ? chrome.storage.local : chrome.storage.sync;
+      storage.set({ apiKey }, () => {
+        currentModel = selectedModel;
+        storedApiKey = apiKey;
+        if (saveStatus) {
+          saveStatus.textContent = "Saved!";
+          saveStatus.style.display = "inline";
+          setTimeout(() => (saveStatus.style.display = "none"), 1500);
+        }
+      });
+    });
+  });
+
+  const agentStatus = document.getElementById("agentStatus");
+  document.getElementById("saveAgent")?.addEventListener("click", () => {
+    const id = document.getElementById("assistantId").value.trim();
+    chrome.storage.sync.set({ assistantId: id }, () => {
+      assistantId = id;
+      if (agentStatus) {
+        agentStatus.textContent = "Saved!";
+        agentStatus.style.display = "inline";
+        setTimeout(() => (agentStatus.style.display = "none"), 1500);
+      }
+    });
+  });
+
+  document.getElementById("createAssistant")?.addEventListener("click", async () => {
+    const apiKey = storedApiKey || document.getElementById("apiKey").value.trim();
+    if (!apiKey) {
+      alert("Enter your API key first.");
+      return;
+    }
+    const id = await createStandardAssistant(apiKey);
+    if (id) {
+      document.getElementById("assistantId").value = id;
+      chrome.storage.sync.set({ assistantId: id }, () => {
+        assistantId = id;
+        if (agentStatus) {
+          agentStatus.textContent = "Assistant created!";
+          agentStatus.style.display = "inline";
+          setTimeout(() => (agentStatus.style.display = "none"), 1500);
+        }
+      });
+    } else {
+      alert("Failed to create assistant.");
+    }
   });
 
   function getVideoId(callback) {
