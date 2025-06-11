@@ -146,9 +146,9 @@ function pollStatus(jobId, videoId) {
       const btn = document.getElementById("yt-ai-btn");
       const container = document.getElementById("yt-ai-container");
       if (btn && container) {
-        btn.innerText = "Server offline";
+        btn.innerText = "Server offline. Click to Retry \u27F3";
         container.style.backgroundColor = "red";
-        btn.disabled = false;
+        btn.disabled = true;
       }
     });
 }

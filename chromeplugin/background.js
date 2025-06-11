@@ -74,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           })
           .catch(err => {
             console.error("Transcription error:", err);
-            updateUI(tabId, "Server offline", "red");
+            updateUI(tabId, "Server offline. Click to Retry \u27F3", "red", true);
             sendResponse({ success: false, error: err.message });
           });
       }
@@ -116,16 +116,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * @param {string} buttonText - The new button text.
  * @param {string} containerColor - The new background color.
  */
-function updateUI(tabId, buttonText, containerColor) {
+function updateUI(tabId, buttonText, containerColor, disableBtn = false) {
   chrome.scripting.executeScript({
     target: { tabId: tabId },
-    func: (btnText, bgColor) => {
+    func: (btnText, bgColor, disable) => {
       const btn = document.getElementById("yt-ai-btn");
-      if (btn) { btn.innerText = btnText; }
+      if (btn) { 
+        btn.innerText = btnText;
+        btn.disabled = disable;
+      }
       const container = document.getElementById("yt-ai-container");
       if (container) { container.style.backgroundColor = bgColor; }
     },
-    args: [buttonText, containerColor]
+    args: [buttonText, containerColor, disableBtn]
   }, () => {
     if (chrome.runtime.lastError) {
       console.error("Script injection error:", chrome.runtime.lastError);
