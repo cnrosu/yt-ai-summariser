@@ -773,6 +773,11 @@ document.addEventListener("DOMContentLoaded", () => {
       "OpenAI-Beta": "assistants=v2",
     };
     const msgBody = { role: "user", content };
+    if (fileReady && fileId) {
+      msgBody.attachments = [
+        { file_id: fileId, tools: [{ type: "file_search" }] },
+      ];
+    }
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
