@@ -126,8 +126,8 @@ details[open] .copy-icon {
 
 .delete-icon {
   position: absolute;
-  top: 4px;
-  right: 6px;
+  bottom: 4px;
+  right: 26px;
   cursor: pointer;
   font-size: 16px;
   opacity: 0.6;
