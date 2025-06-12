@@ -153,6 +153,7 @@ function pollStatus(jobId, videoId) {
           container.style.backgroundColor = "green";
           btn.disabled = false;
         }
+        chrome.runtime.sendMessage({ action: "openPopup" });
       } else if (data.status === "error") {
         clearInterval(statusInterval);
         statusInterval = null;
@@ -206,6 +207,7 @@ function loadCachedTranscript() {
         if (container) {
           container.style.backgroundColor = "green";
         }
+        chrome.runtime.sendMessage({ action: "openPopup" });
       } else {
         console.log("No cached transcript found for this video.");
       }
