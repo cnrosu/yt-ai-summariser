@@ -306,3 +306,39 @@ details[open] .copy-icon {
   background-color: #1a73e8;
   color: #fff;
 }
+
+/* Toast notification for Agent Maker */
+.agent-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  animation: toastFade 2s ease forwards;
+  z-index: 1000;
+}
+
+@keyframes toastFade {
+  0% {
+    transform: translate(-50%, 10px);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -10px);
+    opacity: 0;
+  }
+}
