@@ -104,6 +104,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, error: "No active job" });
     }
     return true;
+  } else if (message.action === "openPopup") {
+    chrome.action.openPopup(() => {
+      if (chrome.runtime.lastError) {
+        console.error("Failed to open popup", chrome.runtime.lastError);
+        sendResponse({ success: false });
+      } else {
+        sendResponse({ success: true });
+      }
+    });
+    return true;
   }
 });
 
