@@ -201,8 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("Stored new Assistant ID", assistantId);
           }
         }
-        if (transcriptBox.value.trim()) {
-          generateSuggestions();
+        if (transcriptBox.value.trim() && currentVideoId) {
+          loadSuggestions(currentVideoId);
         }
       }
     });
@@ -427,7 +427,30 @@ document.addEventListener("DOMContentLoaded", () => {
         transcriptBox.value = "Error decompressing transcript.";
         return;
       }
-      generateSuggestions();
+      loadSuggestions(videoId);
+    });
+  }
+
+  function displaySuggestions(arr) {
+    suggested.innerHTML = "";
+    arr.forEach((q) => {
+      const b = document.createElement("button");
+      b.textContent = q;
+      b.addEventListener("click", () => handleQuestion(q));
+      suggested.appendChild(b);
+    });
+  }
+
+  function loadSuggestions(videoId) {
+    if (!videoId) return;
+    const key = `suggested_${videoId}`;
+    chrome.storage.local.get(key, (res) => {
+      const arr = res[key];
+      if (Array.isArray(arr) && arr.length) {
+        displaySuggestions(arr);
+      } else {
+        generateSuggestions();
+      }
     });
   }
 
@@ -574,17 +597,14 @@ document.addEventListener("DOMContentLoaded", () => {
       { role: "user", content: transcript.slice(0, 4000) },
     ];
     const reply = await sendToGPT(messages, storedApiKey);
-    suggested.innerHTML = "";
-    reply
+    const arr = reply
       .split(/\n|\r/)
       .map((q) => q.trim())
-      .filter((q) => q)
-      .forEach((q) => {
-        const b = document.createElement("button");
-        b.textContent = q;
-        b.addEventListener("click", () => handleQuestion(q));
-        suggested.appendChild(b);
-      });
+      .filter((q) => q);
+    displaySuggestions(arr);
+    if (currentVideoId) {
+      chrome.storage.local.set({ [`suggested_${currentVideoId}`]: arr });
+    }
   }
   function cleanReply(text) {
     return (text || "").replace(/```(?:html)?|```/g, "").trim();
@@ -770,6 +790,7 @@ document.addEventListener("DOMContentLoaded", () => {
       loadTranscript(videoId);
       loadQA(videoId);
       loadThread(videoId);
+      loadSuggestions(videoId);
     } else {
       transcriptBox.value = "Could not detect YouTube video ID.";
     }
