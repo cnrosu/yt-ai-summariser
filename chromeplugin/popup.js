@@ -316,7 +316,8 @@ document.addEventListener("DOMContentLoaded", () => {
     qaContainer.prepend(details);
     attachInteractions(details, answerDiv, question);
 
-    const content = question;
+    const prefix = currentVideoId ? `For transcript ${currentVideoId}: ` : "";
+    const content = prefix + question;
 
     const reply = await sendViaAssistant(content, apiKey);
     const clean = cleanReply(reply);
@@ -503,6 +504,8 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("File upload error", data);
         return null;
       }
+      console.log("Uploaded transcript", data.id);
+      showToast("Transcript uploaded");
       return data.id;
     } catch (err) {
       console.error("Upload failed", err);
@@ -519,6 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         if (data.status === "processed") {
+          console.log("File processed", id);
           showToast("Transcript ready!");
           fileReady = true;
           return;
@@ -544,6 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fileId = await uploadTranscriptFile(videoId, transcript);
         if (fileId) {
           chrome.storage.local.set({ [key]: fileId });
+          console.log("Stored file ID", fileId);
         }
       }
       if (fileId) {

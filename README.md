@@ -6,6 +6,8 @@ The UI features smooth microanimations for button presses and question cards. Sw
 
 Transcripts are cached per video on disk and in the browser. Any questions you ask are saved in Chrome sync storage so they remain tied to your Google account and are not shared with other users. A copy of each question/answer pair is also written on the server next to the transcript for that video.
 
+When a transcript is loaded in the extension it is automatically uploaded to your OpenAI account and indexed for the `file_search` tool. The extension waits for this indexing step to finish before enabling the chat box. Each question sent to the assistant includes the transcript file so GPT can retrieve the relevant passages.
+
 As you continue asking questions, the extension now uses OpenAI's Assistants API
 to keep a dedicated conversation thread per video. If no Assistant ID is saved
 the plugin will automatically create a standard **YouTranscribe** assistant when
