@@ -13,8 +13,10 @@ function showApiError(action, data) {
 
 async function loadAssistants(apiKey) {
   const container = document.getElementById("agentList");
+  const dropdown = document.getElementById("assistantSelect");
   if (!container || !apiKey) return;
   container.innerHTML = "";
+  if (dropdown) dropdown.innerHTML = "";
   try {
     const res = await fetch("https://api.openai.com/v1/assistants?limit=100", {
       headers: {
@@ -36,26 +38,6 @@ async function loadAssistants(apiKey) {
       const info = document.createElement("div");
       info.textContent = "";
       details.appendChild(info);
-      const selectBtn = document.createElement("button");
-      selectBtn.className = "select-agent-btn";
-      selectBtn.textContent = "Use This Agent \ud83e\udd16";
-      selectBtn.addEventListener("click", () => {
-        chrome.storage.sync.set({ assistantId: a.id }, () => {
-          assistantId = a.id;
-          const input = document.getElementById("assistantId");
-          if (input) input.value = a.id;
-          const status = document.getElementById("agentStatus");
-          if (status) {
-            status.textContent = "Saved!";
-            status.style.display = "inline";
-            setTimeout(() => (status.style.display = "none"), 1500);
-          }
-          details.classList.add("copied");
-          showCopyPopup(details, "\ud83e\udd16 Selected");
-          setTimeout(() => details.classList.remove("copied"), 800);
-        });
-      });
-      details.appendChild(selectBtn);
       details.addEventListener("toggle", async () => {
         if (!details.open || info.dataset.loaded) return;
         const d = await fetch(`https://api.openai.com/v1/assistants/${a.id}`, {
@@ -72,9 +54,16 @@ async function loadAssistants(apiKey) {
           `<p><b>Temperature:</b> ${full.temperature ?? ""}</p>` +
           `<p><b>Top P:</b> ${full.top_p ?? ""}</p>`;
         info.dataset.loaded = "1";
-        details.appendChild(selectBtn);
       });
       container.appendChild(details);
+
+      if (dropdown) {
+        const opt = document.createElement("option");
+        opt.value = a.id;
+        opt.textContent = a.name || a.id;
+        if (assistantId === a.id) opt.selected = true;
+        dropdown.appendChild(opt);
+      }
     });
   } catch (err) {
     console.error("Failed to load assistants", err);
@@ -131,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const qaContainer = document.getElementById("qaContainer");
   const chatInput = document.getElementById("chatInput");
   const suggested = document.getElementById("suggested");
+  const agentSelect = document.getElementById("assistantSelect");
 
   function switchTab(id) {
     document.querySelectorAll(".tab-content").forEach((div) =>
@@ -165,6 +155,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .querySelectorAll("#agentsTab .sub-tab-link")
     .forEach((btn) => btn.addEventListener("click", () => switchSubTab(btn.dataset.subTab)));
+
+  agentSelect?.addEventListener("change", () => {
+    const id = agentSelect.value;
+    chrome.storage.sync.set({ assistantId: id }, () => {
+      assistantId = id;
+      const status = document.getElementById("agentStatus");
+      if (status) {
+        status.textContent = "Saved!";
+        status.style.display = "inline";
+        setTimeout(() => (status.style.display = "none"), 1500);
+      }
+    });
+  });
 
   chrome.storage.sync.get(["model", "keyLocation", "assistantId"], (res) => {
     if (res.model) {
