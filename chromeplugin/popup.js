@@ -7,6 +7,7 @@ const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
 let fileId = null;
 let fileReady = false;
+let vectorStoreId = null;
 
 function showApiError(action, data) {
   console.error(`${action} API error`, data);
@@ -203,6 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (transcriptBox.value.trim() && currentVideoId) {
           loadSuggestions(currentVideoId);
+          ensureVectorStore(currentVideoId, transcriptBox.value.trim());
         }
       }
     });
@@ -422,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
-        ensureTranscriptFile(videoId, transcript);
+        ensureVectorStore(videoId, transcript);
       } else {
         transcriptBox.value = "Error decompressing transcript.";
         return;
@@ -509,6 +511,112 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  async function createVectorStore(videoId) {
+    showToast("Creating vector store...");
+    try {
+      const res = await fetch("https://api.openai.com/v1/vector_stores", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${storedApiKey}`,
+          "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
+        },
+        body: JSON.stringify({ name: `yt_vs_${videoId}` }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Vector store creation error", data);
+        return null;
+      }
+      return data.id;
+    } catch (err) {
+      console.error("Create vector store failed", err);
+      return null;
+    }
+  }
+
+  async function attachFileToVectorStore(vsId, fid) {
+    try {
+      const res = await fetch(
+        `https://api.openai.com/v1/vector_stores/${vsId}/file_batches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${storedApiKey}`,
+            "Content-Type": "application/json",
+            "OpenAI-Beta": "assistants=v2",
+          },
+          body: JSON.stringify({ file_ids: [fid] }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("File batch error", data);
+        return null;
+      }
+      return data.id;
+    } catch (err) {
+      console.error("Attach file failed", err);
+      return null;
+    }
+  }
+
+  async function waitForBatch(vsId, batchId) {
+    showToast("Indexing transcript...");
+    try {
+      while (true) {
+        const res = await fetch(
+          `https://api.openai.com/v1/vector_stores/${vsId}/file_batches/${batchId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${storedApiKey}`,
+              "OpenAI-Beta": "assistants=v2",
+            },
+          }
+        );
+        const data = await res.json();
+        if (data.status === "completed") {
+          showToast("Transcript ready!");
+          fileReady = true;
+          return true;
+        }
+        if (data.status === "failed" || data.status === "cancelled") {
+          showToast("File processing failed");
+          return false;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    } catch (err) {
+      console.error("Batch poll error", err);
+      return false;
+    }
+  }
+
+  async function updateAssistantVectorStore(vsId) {
+    if (!assistantId || !vsId) return;
+    try {
+      const res = await fetch(`https://api.openai.com/v1/assistants/${assistantId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${storedApiKey}`,
+          "Content-Type": "application/json",
+          "OpenAI-Beta": "assistants=v2",
+        },
+        body: JSON.stringify({
+          tool_resources: { file_search: { vector_store_ids: [vsId] } },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Update assistant error", data);
+      } else {
+        console.log("Assistant updated with vector store", vsId);
+      }
+    } catch (err) {
+      console.error("Assistant update failed", err);
+    }
+  }
+
   async function uploadTranscriptFile(videoId, transcript) {
     if (!storedApiKey) return null;
     showToast("Uploading transcript...");
@@ -533,44 +641,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function waitForFile(id) {
-    showToast("Indexing transcript...");
-    try {
-      while (true) {
-        const res = await fetch(`https://api.openai.com/v1/files/${id}`, {
-          headers: { Authorization: `Bearer ${storedApiKey}` },
-        });
-        const data = await res.json();
-        if (data.status === "processed") {
-          showToast("Transcript ready!");
-          fileReady = true;
-          return;
-        }
-        if (data.status === "error") {
-          showToast("File processing failed");
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    } catch (err) {
-      console.error("File poll error", err);
-    }
-  }
-
-  function ensureTranscriptFile(videoId, transcript) {
+  async function ensureVectorStore(videoId, transcript) {
     if (!storedApiKey) return;
-    const key = `file_${videoId}`;
+    const fileKey = `file_${videoId}`;
+    const vsKey = `vs_${videoId}`;
+    fileReady = false;
     setInputEnabled(false);
-    chrome.storage.local.get(key, async (res) => {
-      fileId = res[key] || null;
+    chrome.storage.local.get([fileKey, vsKey], async (res) => {
+      fileId = res[fileKey] || null;
+      vectorStoreId = res[vsKey] || null;
+      if (!vectorStoreId) {
+        vectorStoreId = await createVectorStore(videoId);
+        if (vectorStoreId) {
+          chrome.storage.local.set({ [vsKey]: vectorStoreId });
+        }
+      }
       if (!fileId) {
         fileId = await uploadTranscriptFile(videoId, transcript);
         if (fileId) {
-          chrome.storage.local.set({ [key]: fileId });
+          chrome.storage.local.set({ [fileKey]: fileId });
         }
       }
-      if (fileId) {
-        await waitForFile(fileId);
+      if (vectorStoreId && fileId) {
+        const batch = await attachFileToVectorStore(vectorStoreId, fileId);
+        if (batch) {
+          await waitForBatch(vectorStoreId, batch);
+        }
+        await updateAssistantVectorStore(vectorStoreId);
       }
       setInputEnabled(true);
     });
@@ -676,11 +773,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "OpenAI-Beta": "assistants=v2",
     };
     const msgBody = { role: "user", content };
-    if (fileReady && fileId) {
-      msgBody.attachments = [
-        { file_id: fileId, tools: [{ type: "file_search" }] },
-      ];
-    }
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
