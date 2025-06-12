@@ -5,6 +5,8 @@ let qaHistory = [];
 let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
+let fileId = null;
+let fileReady = false;
 
 function showApiError(action, data) {
   console.error(`${action} API error`, data);
@@ -286,13 +288,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function handleQuestion(question) {
     const apiKey = storedApiKey;
-    const transcript = transcriptBox.value.trim();
     if (!apiKey) {
       alert("Missing API key. Please enter it on the settings tab.");
       return;
     }
-    if (!transcript || transcript.startsWith("Transcript not found")) {
-      alert("Transcript not loaded yet. Try transcribing the video first.");
+    if (!fileReady) {
+      alert("Transcript still processing. Please wait.");
       return;
     }
     if (!question) return;
@@ -315,10 +316,8 @@ document.addEventListener("DOMContentLoaded", () => {
     qaContainer.prepend(details);
     attachInteractions(details, answerDiv, question);
 
-    const first = qaHistory.length === 0;
-    const content = first
-      ? `Transcript:\n${transcript}\n\nQuestion:\n${question}`
-      : question;
+    const prefix = currentVideoId ? `For transcript ${currentVideoId}: ` : "";
+    const content = prefix + question;
 
     const reply = await sendViaAssistant(content, apiKey);
     const clean = cleanReply(reply);
@@ -424,6 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
+        ensureTranscriptFile(videoId, transcript);
       } else {
         transcriptBox.value = "Error decompressing transcript.";
         return;
@@ -476,6 +476,85 @@ document.addEventListener("DOMContentLoaded", () => {
       arr = arr.filter((item) => item.question !== question);
       chrome.storage.local.set({ [key]: arr });
       qaHistory = arr.slice();
+    });
+  }
+
+  function setInputEnabled(enabled) {
+    chatInput.disabled = !enabled;
+    document.getElementById("chatSend").disabled = !enabled;
+    document.querySelectorAll(".action-btn").forEach((b) => {
+      b.disabled = !enabled;
+    });
+  }
+
+  async function uploadTranscriptFile(videoId, transcript) {
+    if (!storedApiKey) return null;
+    showToast("Uploading transcript...");
+    const form = new FormData();
+    form.append("purpose", "assistants");
+    form.append("file", new Blob([transcript], { type: "text/plain" }), `${videoId}.txt`);
+    try {
+      const res = await fetch("https://api.openai.com/v1/files", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${storedApiKey}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("File upload error", data);
+        return null;
+      }
+      console.log("Uploaded transcript", data.id);
+      showToast("Transcript uploaded");
+      return data.id;
+    } catch (err) {
+      console.error("Upload failed", err);
+      return null;
+    }
+  }
+
+  async function waitForFile(id) {
+    showToast("Indexing transcript...");
+    try {
+      while (true) {
+        const res = await fetch(`https://api.openai.com/v1/files/${id}`, {
+          headers: { Authorization: `Bearer ${storedApiKey}` },
+        });
+        const data = await res.json();
+        if (data.status === "processed") {
+          console.log("File processed", id);
+          showToast("Transcript ready!");
+          fileReady = true;
+          return;
+        }
+        if (data.status === "error") {
+          showToast("File processing failed");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    } catch (err) {
+      console.error("File poll error", err);
+    }
+  }
+
+  function ensureTranscriptFile(videoId, transcript) {
+    if (!storedApiKey) return;
+    const key = `file_${videoId}`;
+    setInputEnabled(false);
+    chrome.storage.local.get(key, async (res) => {
+      fileId = res[key] || null;
+      if (!fileId) {
+        fileId = await uploadTranscriptFile(videoId, transcript);
+        if (fileId) {
+          chrome.storage.local.set({ [key]: fileId });
+          console.log("Stored file ID", fileId);
+        }
+      }
+      if (fileId) {
+        await waitForFile(fileId);
+      }
+      setInputEnabled(true);
     });
   }
 
@@ -581,10 +660,16 @@ document.addEventListener("DOMContentLoaded", () => {
       "Content-Type": "application/json",
       "OpenAI-Beta": "assistants=v2",
     };
+    const msgBody = { role: "user", content };
+    if (fileReady && fileId) {
+      msgBody.attachments = [
+        { file_id: fileId, tools: [{ type: "file_search" }] },
+      ];
+    }
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ role: "user", content }),
+      body: JSON.stringify(msgBody),
     });
     console.log("Posted user message to thread");
     const runRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
@@ -634,6 +719,7 @@ document.addEventListener("DOMContentLoaded", () => {
           name,
           instructions:
             "You are a YouTube video transcription AI. Answer questions about the provided transcript in concise HTML.",
+          tools: [{ type: "file_search" }],
         }),
       });
       const data = await res.json();
