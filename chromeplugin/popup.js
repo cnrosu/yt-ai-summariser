@@ -117,6 +117,7 @@ async function createCustomAssistant(apiKey) {
         status.style.display = "inline";
         setTimeout(() => (status.style.display = "none"), 1500);
       }
+      showToast("Agent Created \ud83e\udd16");
     } else {
       alert("Failed to create assistant.");
     }
@@ -218,6 +219,14 @@ document.addEventListener("DOMContentLoaded", () => {
     popup.className = "copy-popup";
     popup.textContent = text;
     el.appendChild(popup);
+    popup.addEventListener("animationend", () => popup.remove(), { once: true });
+  }
+
+  function showToast(message) {
+    const popup = document.createElement("div");
+    popup.className = "agent-toast";
+    popup.textContent = message;
+    document.body.appendChild(popup);
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
   }
 
