@@ -149,11 +149,29 @@ function pollStatus(jobId, videoId) {
         const compressed = LZString.compressToUTF16(transcript);
         chrome.storage.local.set({ [`transcript_${videoId}`]: compressed });
         if (btn && container) {
-          btn.innerText = "Done!";
-          container.style.backgroundColor = "green";
-          btn.disabled = false;
+          btn.innerText = "Processing Transcript...";
+          container.style.backgroundColor = "#1a73e8";
+          btn.disabled = true;
         }
-        chrome.runtime.sendMessage({ action: "openPopup" });
+        chrome.runtime.sendMessage(
+          { action: "processTranscript", videoId, transcript },
+          (res) => {
+            if (res && res.success) {
+              if (btn && container) {
+                btn.innerText = "Done!";
+                btn.disabled = false;
+                container.style.backgroundColor = "green";
+              }
+              if (res.uploaded) {
+                chrome.runtime.sendMessage({ action: "openPopup" });
+              }
+            } else if (btn && container) {
+              btn.innerText = "Failed";
+              container.style.backgroundColor = "red";
+              btn.disabled = false;
+            }
+          }
+        );
       } else if (data.status === "error") {
         clearInterval(statusInterval);
         statusInterval = null;
@@ -197,17 +215,34 @@ function loadCachedTranscript() {
         chrome.storage.local.set({ [`transcript_${videoId}`]: compressed }, () => {
           console.log(`Transcript for video ${videoId} saved in chrome storage.`);
         });
-        // Update UI: set button text and container background.
         const btn = document.getElementById("yt-ai-btn");
         if (btn) {
-          btn.innerText = "Done!";
-          btn.disabled = false;
+          btn.innerText = "Processing Transcript...";
+          btn.disabled = true;
         }
         const container = document.getElementById("yt-ai-container");
         if (container) {
-          container.style.backgroundColor = "green";
+          container.style.backgroundColor = "#1a73e8";
         }
-        chrome.runtime.sendMessage({ action: "openPopup" });
+        chrome.runtime.sendMessage(
+          { action: "processTranscript", videoId, transcript: text },
+          (res) => {
+            if (res && res.success) {
+              if (btn && container) {
+                btn.innerText = "Done!";
+                btn.disabled = false;
+                container.style.backgroundColor = "green";
+              }
+              if (res.uploaded) {
+                chrome.runtime.sendMessage({ action: "openPopup" });
+              }
+            } else if (btn && container) {
+              btn.innerText = "Failed";
+              container.style.backgroundColor = "red";
+              btn.disabled = false;
+            }
+          }
+        );
       } else {
         console.log("No cached transcript found for this video.");
       }

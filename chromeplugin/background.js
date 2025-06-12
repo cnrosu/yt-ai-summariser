@@ -114,6 +114,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
     return true;
+  } else if (message.action === "processTranscript") {
+    const { videoId, transcript } = message;
+    const tabId = sender.tab.id;
+    (async () => {
+      const apiKey = await getApiKey();
+      if (!apiKey) {
+        updateUI(tabId, "Missing API Key", "red");
+        sendResponse({ success: false });
+        return;
+      }
+      let fileId = await checkExistingFile(videoId, apiKey);
+      let uploaded = false;
+      if (!fileId) {
+        fileId = await uploadTranscriptFile(videoId, transcript, apiKey);
+        if (!fileId) {
+          updateUI(tabId, "Upload failed", "red", false);
+          sendResponse({ success: false });
+          return;
+        }
+        await waitForFile(fileId, apiKey);
+        chrome.storage.local.set({ [`file_${videoId}`]: fileId });
+        uploaded = true;
+      }
+      updateUI(tabId, "Done!", "green");
+      sendResponse({ success: true, uploaded });
+      if (uploaded) chrome.action.openPopup(() => {});
+    })();
+    return true;
   }
 });
 
@@ -144,4 +172,107 @@ function updateUI(tabId, buttonText, containerColor, disableBtn = false) {
       console.error("Script injection error:", chrome.runtime.lastError);
     }
   });
+}
+
+function getApiKey() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(["keyLocation"], (res) => {
+      const location = res.keyLocation || "sync";
+      const storage = location === "local" ? chrome.storage.local : chrome.storage.sync;
+      storage.get(["apiKey"], (r) => {
+        resolve(r.apiKey || null);
+      });
+    });
+  });
+}
+
+async function checkExistingFile(videoId, apiKey) {
+  const key = `file_${videoId}`;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, async (res) => {
+      let id = res[key];
+      if (id) {
+        try {
+          const r = await fetch(`https://api.openai.com/v1/files/${id}`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+          });
+          if (r.ok) {
+            const data = await r.json();
+            if (data.status === "processed") {
+              resolve(id);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("File check error", err);
+        }
+      }
+      try {
+        const r = await fetch("https://api.openai.com/v1/files?purpose=assistants", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const data = await r.json();
+        if (Array.isArray(data.data)) {
+          const match = data.data.find(
+            (f) => f.filename === `${videoId}.txt` && f.status === "processed"
+          );
+          if (match) {
+            chrome.storage.local.set({ [key]: match.id });
+            resolve(match.id);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("File list error", err);
+      }
+      resolve(null);
+    });
+  });
+}
+
+async function uploadTranscriptFile(videoId, transcript, apiKey) {
+  const form = new FormData();
+  form.append("purpose", "assistants");
+  form.append(
+    "file",
+    new Blob([transcript], { type: "text/plain" }),
+    `${videoId}.txt`
+  );
+  try {
+    const res = await fetch("https://api.openai.com/v1/files", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("File upload error", data);
+      return null;
+    }
+    return data.id;
+  } catch (err) {
+    console.error("Upload failed", err);
+    return null;
+  }
+}
+
+async function waitForFile(id, apiKey) {
+  try {
+    while (true) {
+      const res = await fetch(`https://api.openai.com/v1/files/${id}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      const data = await res.json();
+      if (data.status === "processed") {
+        return true;
+      }
+      if (data.status === "error") {
+        return false;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  } catch (err) {
+    console.error("File poll error", err);
+    return false;
+  }
 }
