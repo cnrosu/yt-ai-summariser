@@ -38,7 +38,7 @@ async function loadAssistants(apiKey) {
       details.appendChild(info);
       const selectBtn = document.createElement("button");
       selectBtn.className = "select-agent-btn";
-      selectBtn.textContent = "Select Agent";
+      selectBtn.textContent = "Use This Agent \ud83e\udd16";
       selectBtn.addEventListener("click", () => {
         chrome.storage.sync.set({ assistantId: a.id }, () => {
           assistantId = a.id;
@@ -50,9 +50,12 @@ async function loadAssistants(apiKey) {
             status.style.display = "inline";
             setTimeout(() => (status.style.display = "none"), 1500);
           }
+          details.classList.add("copied");
+          showCopyPopup(details, "\ud83e\udd16 Selected");
+          setTimeout(() => details.classList.remove("copied"), 800);
         });
       });
-      info.appendChild(selectBtn);
+      details.appendChild(selectBtn);
       details.addEventListener("toggle", async () => {
         if (!details.open || info.dataset.loaded) return;
         const d = await fetch(`https://api.openai.com/v1/assistants/${a.id}`, {
@@ -62,12 +65,14 @@ async function loadAssistants(apiKey) {
           },
         });
         const full = await d.json();
-        info.innerHTML = `<p><b>Description:</b> ${full.description || ""}</p>` +
+        info.innerHTML =
+          `<p><b>Description:</b> ${full.description || ""}</p>` +
           `<p><b>Instructions:</b> ${full.instructions || ""}</p>` +
           `<p><b>Model:</b> ${full.model}</p>` +
           `<p><b>Temperature:</b> ${full.temperature ?? ""}</p>` +
           `<p><b>Top P:</b> ${full.top_p ?? ""}</p>`;
         info.dataset.loaded = "1";
+        details.appendChild(selectBtn);
       });
       container.appendChild(details);
     });
@@ -208,10 +213,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("topPVal").textContent = e.target.value;
   });
 
-  function showCopyPopup(el) {
+  function showCopyPopup(el, text = "\ud83d\udccb Copied") {
     const popup = document.createElement("span");
     popup.className = "copy-popup";
-    popup.textContent = "\ud83d\udccb Copied";
+    popup.textContent = text;
     el.appendChild(popup);
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
   }
