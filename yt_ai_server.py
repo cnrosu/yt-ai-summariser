@@ -187,7 +187,10 @@ def job_status():
     LOGGER.info("Status check %s %s", job_id, job.status)
     if job.status == "done" and job.transcript:
         LOGGER.info("Returning transcript length %d", len(job.transcript))
-    return jsonify(job.to_dict())
+    response = jsonify(job.to_dict())
+    if job.status in ("done", "error", "cancelled"):
+        job_manager.remove(job_id)
+    return response
 
 @app.route("/api/kill", methods=["POST"])
 def kill_job():
@@ -201,6 +204,7 @@ def kill_job():
         LOGGER.info("Decremented listener count for %s to %d", job_id, job.listeners)
         return jsonify({"success": True, "status": job.status, "listeners": job.listeners})
     job_manager.update(job_id, killed=True, status="cancelled", listeners=0)
+    job_manager.remove(job_id)
     return jsonify({"success": True, "status": "cancelled", "listeners": 0})
 
 @app.route("/api/load", methods=["GET"])

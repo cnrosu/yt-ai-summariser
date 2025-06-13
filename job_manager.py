@@ -38,3 +38,8 @@ class JobManager:
                 return 0
             job.listeners += 1
             return job.listeners
+
+    def remove(self, job_id: str) -> bool:
+        """Delete a job from the manager."""
+        with self._lock:
+            return self.jobs.pop(job_id, None) is not None
