@@ -5,6 +5,8 @@ let qaHistory = [];
 let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
+let loadedTranscript = "";
+let transcriptPosted = false;
 
 function showApiError(action, data) {
   console.error(`${action} API error`, data);
@@ -166,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
         status.style.display = "inline";
         setTimeout(() => (status.style.display = "none"), 1500);
       }
+      attemptSendTranscript();
     });
   });
 
@@ -202,6 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (transcriptBox.value.trim() && currentVideoId) {
           loadSuggestions(currentVideoId);
         }
+        attemptSendTranscript();
       }
     });
   });
@@ -231,6 +235,40 @@ document.addEventListener("DOMContentLoaded", () => {
     popup.textContent = message;
     document.body.appendChild(popup);
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
+  }
+
+  async function sendTranscriptToThread(transcript, apiKey) {
+    if (!assistantId || !transcript || transcriptPosted) return;
+    await ensureThread();
+    if (!threadId) return;
+    const headers = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "OpenAI-Beta": "assistants=v2",
+    };
+    const body = {
+      role: "user",
+      content:
+        "In reference to any future questions, instructions, etc. refer to the following transcript:\n" +
+        transcript,
+    };
+    try {
+      await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      transcriptPosted = true;
+      console.log("Transcript message sent to thread");
+    } catch (err) {
+      console.error("Failed to send transcript", err);
+    }
+  }
+
+  function attemptSendTranscript() {
+    if (!storedApiKey || !assistantId || !loadedTranscript || transcriptPosted)
+      return;
+    sendTranscriptToThread(loadedTranscript, storedApiKey);
   }
 
   function attachInteractions(details, answerDiv, question) {
@@ -310,8 +348,8 @@ document.addEventListener("DOMContentLoaded", () => {
     qaContainer.prepend(details);
     attachInteractions(details, answerDiv, question);
 
-    const transcript = transcriptBox.value.trim();
-    const reply = await sendViaAssistant(question, transcript, apiKey);
+    attemptSendTranscript();
+    const reply = await sendViaAssistant(question, apiKey);
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
     summary.removeChild(loader);
@@ -379,6 +417,7 @@ document.addEventListener("DOMContentLoaded", () => {
         agentStatus.style.display = "inline";
         setTimeout(() => (agentStatus.style.display = "none"), 1500);
       }
+      attemptSendTranscript();
     });
   });
 
@@ -415,6 +454,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
+        loadedTranscript = transcript;
+        attemptSendTranscript();
       } else {
         transcriptBox.value = "Error decompressing transcript.";
         return;
@@ -553,6 +594,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.get(key, (res) => {
       threadId = res[key] || null;
       console.log("Loaded thread ID from storage:", threadId);
+      attemptSendTranscript();
     });
   }
 
@@ -574,12 +616,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentVideoId && threadId) {
         chrome.storage.local.set({ [`thread_${currentVideoId}`]: threadId });
       }
+      attemptSendTranscript();
     } catch (err) {
       console.error("Failed to create thread", err);
     }
   }
 
-  async function sendViaAssistant(question, transcript, apiKey) {
+  async function sendViaAssistant(question, apiKey) {
     if (!assistantId) {
       return "Assistant ID not set.";
     }
@@ -593,10 +636,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "Content-Type": "application/json",
       "OpenAI-Beta": "assistants=v2",
     };
-    const msgBody = {
-      role: "user",
-      content: `${question}\n\nTranscript:\n${transcript}`,
-    };
+    const msgBody = { role: "user", content: question };
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
