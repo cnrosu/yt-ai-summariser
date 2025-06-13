@@ -158,5 +158,28 @@ def test_kill_sets_killed_flag(app):
     assert kill["success"] is True
     assert kill["status"] == "cancelled"
     assert kill["listeners"] == 0
-    assert server.jobs[jid].killed is True
+    assert jid not in server.jobs
+
+
+def test_job_removed_after_completion(app):
+    client, server = app
+    url = "https://www.youtube.com/watch?v=cleanup"
+
+    resp = client.post("/api/transcribe", json={"url": url}).get_json()
+    jid = resp["jobId"]
+
+    status = client.get("/api/status", query_string={"jobId": jid}).get_json()
+    assert status["status"] == "done"
+    assert jid not in server.jobs
+
+
+def test_job_removed_after_cancel(app):
+    client, server = app
+    url = "https://www.youtube.com/watch?v=cancel"
+
+    resp = client.post("/api/transcribe", json={"url": url}).get_json()
+    jid = resp["jobId"]
+
+    client.post("/api/kill", query_string={"jobId": jid}).get_json()
+    assert jid not in server.jobs
 
