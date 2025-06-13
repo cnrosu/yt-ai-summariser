@@ -779,10 +779,16 @@ document.addEventListener("DOMContentLoaded", () => {
       body: JSON.stringify(msgBody),
     });
     console.log("Posted user message to thread");
+    const runBody = { assistant_id: assistantId };
+    if (vectorStoreId) {
+      runBody.tool_resources = {
+        file_search: { vector_store_ids: [vectorStoreId] },
+      };
+    }
     const runRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ assistant_id: assistantId }),
+      body: JSON.stringify(runBody),
     });
     const run = await runRes.json();
     if (run.error) {
