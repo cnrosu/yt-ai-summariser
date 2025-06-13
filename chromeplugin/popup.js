@@ -5,8 +5,6 @@ let qaHistory = [];
 let assistantId = "";
 const DEFAULT_ASSISTANT_NAME = "asst_youtranscribe_default";
 let threadId = null;
-let fileId = null;
-let fileReady = false;
 
 function showApiError(action, data) {
   console.error(`${action} API error`, data);
@@ -292,10 +290,6 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Missing API key. Please enter it on the settings tab.");
       return;
     }
-    if (!fileReady) {
-      alert("Transcript still processing. Please wait.");
-      return;
-    }
     if (!question) return;
     const details = document.createElement("details");
     details.className = "card fade-in loading";
@@ -316,9 +310,8 @@ document.addEventListener("DOMContentLoaded", () => {
     qaContainer.prepend(details);
     attachInteractions(details, answerDiv, question);
 
-    const content = question;
-
-    const reply = await sendViaAssistant(content, apiKey);
+    const transcript = transcriptBox.value.trim();
+    const reply = await sendViaAssistant(question, transcript, apiKey);
     const clean = cleanReply(reply);
     answerDiv.innerHTML = clean;
     summary.removeChild(loader);
@@ -422,7 +415,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const transcript = LZString.decompressFromUTF16(compressed);
       if (transcript) {
         transcriptBox.value = transcript;
-        ensureTranscriptFile(videoId, transcript);
       } else {
         transcriptBox.value = "Error decompressing transcript.";
         return;
@@ -501,80 +493,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function setInputEnabled(enabled) {
-    chatInput.disabled = !enabled;
-    document.getElementById("chatSend").disabled = !enabled;
-    document.querySelectorAll(".action-btn").forEach((b) => {
-      b.disabled = !enabled;
-    });
-  }
-
-  async function uploadTranscriptFile(videoId, transcript) {
-    if (!storedApiKey) return null;
-    showToast("Uploading transcript...");
-    const form = new FormData();
-    form.append("purpose", "assistants");
-    form.append("file", new Blob([transcript], { type: "text/plain" }), `${videoId}.txt`);
-    try {
-      const res = await fetch("https://api.openai.com/v1/files", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${storedApiKey}` },
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("File upload error", data);
-        return null;
-      }
-      return data.id;
-    } catch (err) {
-      console.error("Upload failed", err);
-      return null;
-    }
-  }
-
-  async function waitForFile(id) {
-    showToast("Indexing transcript...");
-    try {
-      while (true) {
-        const res = await fetch(`https://api.openai.com/v1/files/${id}`, {
-          headers: { Authorization: `Bearer ${storedApiKey}` },
-        });
-        const data = await res.json();
-        if (data.status === "processed") {
-          showToast("Transcript ready!");
-          fileReady = true;
-          return;
-        }
-        if (data.status === "error") {
-          showToast("File processing failed");
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    } catch (err) {
-      console.error("File poll error", err);
-    }
-  }
-
-  function ensureTranscriptFile(videoId, transcript) {
-    if (!storedApiKey) return;
-    const key = `file_${videoId}`;
-    setInputEnabled(false);
-    chrome.storage.local.get(key, async (res) => {
-      fileId = res[key] || null;
-      if (!fileId) {
-        fileId = await uploadTranscriptFile(videoId, transcript);
-        if (fileId) {
-          chrome.storage.local.set({ [key]: fileId });
-        }
-      }
-      if (fileId) {
-        await waitForFile(fileId);
-      }
-      setInputEnabled(true);
-    });
-  }
 
   async function generateSuggestions() {
     if (!storedApiKey) return;
@@ -661,7 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function sendViaAssistant(content, apiKey) {
+  async function sendViaAssistant(question, transcript, apiKey) {
     if (!assistantId) {
       return "Assistant ID not set.";
     }
@@ -675,12 +593,10 @@ document.addEventListener("DOMContentLoaded", () => {
       "Content-Type": "application/json",
       "OpenAI-Beta": "assistants=v2",
     };
-    const msgBody = { role: "user", content };
-    if (fileReady && fileId) {
-      msgBody.attachments = [
-        { file_id: fileId, tools: [{ type: "file_search" }] },
-      ];
-    }
+    const msgBody = {
+      role: "user",
+      content: `${question}\n\nTranscript:\n${transcript}`,
+    };
     await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
@@ -734,7 +650,7 @@ document.addEventListener("DOMContentLoaded", () => {
           name,
           instructions:
             "You are a YouTube video transcription AI. Answer questions about the provided transcript in concise HTML.",
-          tools: [{ type: "file_search" }],
+          tools: [],
         }),
       });
       const data = await res.json();
